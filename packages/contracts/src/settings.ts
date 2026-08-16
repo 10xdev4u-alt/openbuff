@@ -475,6 +475,53 @@ export const OpenCodeSettings = makeProviderSettingsSchema(
 );
 export type OpenCodeSettings = typeof OpenCodeSettings.Type;
 
+export const FreebuffSettings = makeProviderSettingsSchema(
+  {
+    enabled: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(true)),
+      Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
+    ),
+    apiKey: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "API key",
+        description: "Codebuff API key. Create one for free at codebuff.com/api-keys.",
+        providerSettingsForm: {
+          control: "password",
+          placeholder: "ck_...",
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
+    agent: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("codebuff/base@0.0.16")),
+      Schema.annotateKey({
+        title: "Agent",
+        description: "Codebuff agent id the engine runs.",
+        providerSettingsForm: {
+          placeholder: "codebuff/base@0.0.16",
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
+    model: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "Model override",
+        description: "Optional model slug (OpenRouter format) overriding the agent's default.",
+        providerSettingsForm: {
+          placeholder: "anthropic/claude-opus-5",
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
+  },
+  {
+    order: ["apiKey", "agent", "model"],
+  },
+);
+export type FreebuffSettings = typeof FreebuffSettings.Type;
+
 export const ObservabilitySettings = Schema.Struct({
   otlpTracesUrl: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   otlpMetricsUrl: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
@@ -605,6 +652,7 @@ export const ServerSettings = Schema.Struct({
     cursor: CursorSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     grok: GrokSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     opencode: OpenCodeSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+    freebuff: FreebuffSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   }).pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   // New driver-agnostic instance map. Keyed by `ProviderInstanceId`; values
   // are `ProviderInstanceConfig` envelopes. The driver-specific config blob
@@ -708,6 +756,13 @@ const OpenCodeSettingsPatch = Schema.Struct({
   customModels: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 
+const FreebuffSettingsPatch = Schema.Struct({
+  enabled: Schema.optionalKey(Schema.Boolean),
+  apiKey: Schema.optionalKey(TrimmedString),
+  agent: Schema.optionalKey(TrimmedString),
+  model: Schema.optionalKey(TrimmedString),
+});
+
 export const ServerSettingsPatch = Schema.Struct({
   // Server settings
   enableLegacyTokenStreaming: Schema.optionalKey(Schema.Boolean),
@@ -748,6 +803,7 @@ export const ServerSettingsPatch = Schema.Struct({
       cursor: Schema.optionalKey(CursorSettingsPatch),
       grok: Schema.optionalKey(GrokSettingsPatch),
       opencode: Schema.optionalKey(OpenCodeSettingsPatch),
+      freebuff: Schema.optionalKey(FreebuffSettingsPatch),
     }),
   ),
   // Whole-map replacement for the new instance config. Patching individual
