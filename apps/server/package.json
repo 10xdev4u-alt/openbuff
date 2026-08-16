@@ -1,5 +1,5 @@
 {
-  "name": "t3",
+  "name": "openbuff",
   "version": "0.0.33",
   "license": "MIT",
   "repository": {
@@ -8,7 +8,7 @@
     "directory": "apps/server"
   },
   "bin": {
-    "t3": "./dist/bin.mjs"
+     "openbuff": "./dist/bin.mjs"
   },
   "files": [
     "dist"
