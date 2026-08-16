@@ -22,9 +22,11 @@ export function shouldShowProviderStatusBanner(
 
 export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   onDismiss,
+  onOpenSettings,
   status,
 }: {
   onDismiss: () => void;
+  onOpenSettings: () => void;
   status: ServerProvider | null;
 }) {
   if (!status || status.status === "ready" || status.status === "disabled") {
@@ -36,12 +38,15 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   const title = isUnauthenticated
     ? `${providerName} is unauthenticated`
     : `${providerName} provider status`;
-  const message = isUnauthenticated
-    ? "Sign in via the CLI to authenticate again."
-    : (status.message ??
-      (status.status === "error"
+  // Driver-supplied message wins: drivers know their own recovery path
+  // (e.g. Freebuff points at its API-key settings field).
+  const message =
+    status.message ??
+    (isUnauthenticated
+      ? "Add credentials in Settings → Connections to start using this provider."
+      : status.status === "error"
         ? `${providerName} provider is unavailable.`
-        : `${providerName} provider has limited availability.`));
+        : `${providerName} provider has limited availability.`);
 
   return (
     <div className="pointer-events-auto mx-auto w-fit max-w-[calc(100%-2rem)] pt-3">
@@ -67,6 +72,15 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
             </TooltipPopup>
           </Tooltip>
         </div>
+        <Button
+          aria-label={`Open settings to fix ${providerName} provider`}
+          className="shrink-0"
+          onClick={onOpenSettings}
+          size="xs"
+          variant="secondary"
+        >
+          Open settings
+        </Button>
         <Button
           aria-label={`Dismiss ${providerName} provider ${status.status}`}
           className="absolute top-2 right-2 size-6 text-muted-foreground hover:text-foreground"

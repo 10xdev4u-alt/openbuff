@@ -98,7 +98,12 @@ export const FreebuffDriver: ProviderDriver<FreebuffSettings, FreebuffDriverEnv>
             type: "api_key",
             label: "Codebuff API key",
           },
-          ...(hasKey ? {} : { message: "No API key set — add one in settings." }),
+          ...(hasKey
+            ? {}
+            : {
+                message:
+                  "No API key set — grab a free one at codebuff.com/api-keys, then add it in Settings → Connections.",
+              }),
         },
       });
 
