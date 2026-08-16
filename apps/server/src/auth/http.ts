@@ -39,6 +39,7 @@ import * as SessionStore from "./SessionStore.ts";
 import { traceAuthenticatedRelayRequest, traceRelayRequest } from "../cloud/traceRelayRequest.ts";
 import { deriveAuthClientMetadata } from "./utils.ts";
 import { verifyRequestDpopProof } from "./dpop.ts";
+import { isLoopbackHostname } from "../http.ts";
 
 const CREDENTIAL_RESPONSE_HEADERS = {
   "cache-control": "no-store",
@@ -224,10 +225,29 @@ export const authHttpApiLayer = HttpApiBuilder.group(
           function* (args) {
             yield* annotateEnvironmentRequest(args.endpoint.name);
             const request = yield* HttpServerRequest.HttpServerRequest;
-            const result = yield* serverAuth.createBrowserSession(
-              args.payload.credential,
-              deriveAuthClientMetadata({ request }),
-            );
+            const result = yield* (() => {
+              if (args.payload.credential !== undefined) {
+                return serverAuth.createBrowserSession(
+                  args.payload.credential,
+                  deriveAuthClientMetadata({ request }),
+                );
+              }
+              // Local-first bootstrap: no credential. Grant only when the
+              // request is provably from this machine (loopback Host) and
+              // not a cross-site fetch (Sec-Fetch-Site) — together these
+              // block CSRF and DNS-rebinding attempts from web pages.
+              const host = request.headers.host ?? "";
+              const hostName = host.split(":")[0] ?? "";
+              const fetchSite = request.headers["sec-fetch-site"];
+              const loopbackTrusted =
+                isLoopbackHostname(hostName) && fetchSite !== "cross-site";
+              if (!loopbackTrusted) {
+                return failEnvironmentAuthInvalid("invalid_credential");
+              }
+              return serverAuth.createLocalBrowserSession(
+                deriveAuthClientMetadata({ request }),
+              );
+            })();
             const sessionCookies = yield* Effect.fromResult(
               Cookies.set(Cookies.empty, sessions.cookieName, result.sessionToken, {
                 expires: DateTime.toDate(result.response.expiresAt),
