@@ -86,9 +86,12 @@ const resolveAuth = (
     if (contents === null) {
       return { token: "", email: undefined };
     }
-    const parsedUnknown = yield* Schema.decodeUnknownEffect(Schema.Json)(
-      contents,
-    ).pipe(Effect.orElseSucceed(() => null));
+    // `Schema.Json` is the schema of already-parsed JSON values, so decoding a
+    // raw string against it succeeds trivially and returns the string unchanged.
+    // `fromJsonString` is what actually parses the JSON text into a value.
+    const parsedUnknown = yield* Schema.decodeUnknownEffect(
+      Schema.fromJsonString(Schema.Unknown),
+    )(contents).pipe(Effect.orElseSucceed(() => null));
     const parsed =
       typeof parsedUnknown === "object" && parsedUnknown !== null
         ? (parsedUnknown as { default?: { authToken?: unknown; email?: unknown } })
