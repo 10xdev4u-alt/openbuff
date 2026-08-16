@@ -36,7 +36,7 @@ describe("ProviderStatusBanner", () => {
 
   it("renders an accessible dismiss control for provider warnings", () => {
     const markup = renderToStaticMarkup(
-      <ProviderStatusBanner status={warningProvider()} onDismiss={() => {}} />,
+      <ProviderStatusBanner status={warningProvider()} onDismiss={() => {}} onOpenSettings={() => {}} />,
     );
 
     expect(markup).toContain('role="alert"');
@@ -46,7 +46,7 @@ describe("ProviderStatusBanner", () => {
 
   it("renders on a glass surface so the timeline never reads through the banner", () => {
     const markup = renderToStaticMarkup(
-      <ProviderStatusBanner status={warningProvider()} onDismiss={() => {}} />,
+      <ProviderStatusBanner status={warningProvider()} onDismiss={() => {}} onOpenSettings={() => {}} />,
     );
 
     expect(markup).toContain("alert-glass");
@@ -58,6 +58,7 @@ describe("ProviderStatusBanner", () => {
       <ProviderStatusBanner
         status={{ ...warningProvider(), status: "error" }}
         onDismiss={() => {}}
+        onOpenSettings={() => {}}
       />,
     );
 

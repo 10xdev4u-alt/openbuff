@@ -6295,6 +6295,7 @@ function ChatViewContent(props: ChatViewProps) {
               <ProviderStatusBanner
                 status={visibleProviderStatus}
                 onDismiss={() => setDismissedProviderStatusBannerKey(providerStatusBannerKey)}
+                onOpenSettings={() => void navigate({ to: "/settings/connections" })}
               />
             </div>
             {/* Messages Wrapper */}
