@@ -105,7 +105,9 @@ export const expandHomePath = Effect.fn(function* (input: string) {
 export const resolveBaseDir = Effect.fn(function* (raw: string | undefined) {
   const { join, resolve } = yield* Path.Path;
   if (!raw || raw.trim().length === 0) {
-    return join(NodeOS.homedir(), ".t3");
+    // OpenBuff's own home — deliberately NOT t3's `~/.t3`, so a host t3
+    // installation (state, credentials, sessions) is never touched.
+    return join(NodeOS.homedir(), ".openbuff");
   }
   return resolve(yield* expandHomePath(raw.trim()));
 });

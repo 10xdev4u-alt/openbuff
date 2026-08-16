@@ -14,7 +14,9 @@ import * as LogLevel from "effect/LogLevel";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 
-export const DEFAULT_PORT = 3773;
+// 3774, one above t3's 3773, so OpenBuff and a host t3 server can run
+// side by side without port races.
+export const DEFAULT_PORT = 3774;
 
 export const RuntimeMode = Schema.Literals(["web", "desktop"]);
 export type RuntimeMode = typeof RuntimeMode.Type;
