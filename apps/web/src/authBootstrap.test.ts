@@ -108,7 +108,10 @@ async function installAuthApi(input: {
   const testApi = await installEnvironmentHttpTest({
     ...(input.session ? { session: () => Effect.succeed(input.session!()) } : {}),
     ...(input.browserSession
-      ? { browserSession: (payload) => input.browserSession!(payload.credential) }
+      ? {
+          browserSession: (payload) =>
+            input.browserSession!(payload.credential ?? ""),
+        }
       : {}),
     ...(input.pairingCredential
       ? { pairingCredential: (payload) => input.pairingCredential!(payload) }

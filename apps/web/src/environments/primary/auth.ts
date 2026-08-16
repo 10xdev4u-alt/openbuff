@@ -317,6 +317,25 @@ function isTransientBootstrapError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
+/**
+ * Local-first bootstrap attempt: asks for a session without a credential.
+ * The server grants one only for loopback, same-origin requests (physical
+ * machine = identity); anything else 401s and the caller falls back to the
+ * normal pairing flow unchanged.
+ */
+async function attemptLocalBootstrap(): Promise<boolean> {
+  try {
+    await runPrimaryHttp(
+      PrimaryEnvironmentHttpClient.pipe(
+        Effect.flatMap((client) => client.auth.browserSession({ payload: {} })),
+      ),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function bootstrapServerAuth(): Promise<ServerAuthGateState> {
   const bootstrapCredential = getDesktopBootstrapCredential();
   const currentSession = await fetchSessionState();
@@ -325,6 +344,10 @@ async function bootstrapServerAuth(): Promise<ServerAuthGateState> {
   }
 
   if (!bootstrapCredential) {
+    if (await attemptLocalBootstrap()) {
+      await waitForAuthenticatedSessionAfterBootstrap();
+      return { status: "authenticated" };
+    }
     return {
       status: "requires-auth",
       auth: currentSession.auth,

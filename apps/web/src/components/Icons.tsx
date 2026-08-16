@@ -3,6 +3,17 @@ import { cn } from "~/lib/utils";
 
 export type Icon = React.FC<SVGProps<SVGSVGElement>>;
 
+export const OpenBuffIcon: Icon = (props) => (
+  <svg
+    {...props}
+    viewBox="0 0 24 24"
+    fill="none"
+    className={cn("fill-[#EA580C]", props.className)}
+  >
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm-3.2 5.4c.9.25 1.6.85 1.95 1.65L8.3 10.6c-.2-.9-.05-1.85.5-3.2Zm6.4 0c.55 1.35.7 2.3.5 3.2l-2.45-1.55c.35-.8 1.05-1.4 1.95-1.65ZM12 19c-3.15 0-5.75-2.2-6.4-5.15l2.05-1.3c.35 1.9 1.5 3.45 3.1 4.1v-1.7h2.5v1.7c1.6-.65 2.75-2.2 3.1-4.1l2.05 1.3C17.75 16.8 15.15 19 12 19Z" />
+  </svg>
+);
+
 export const GitHubIcon: Icon = (props) => (
   <svg {...props} viewBox="0 0 1024 1024" fill="none">
     <path

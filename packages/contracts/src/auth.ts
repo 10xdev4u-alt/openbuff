@@ -144,7 +144,12 @@ export const ServerAuthDescriptor = Schema.Struct({
 export type ServerAuthDescriptor = typeof ServerAuthDescriptor.Type;
 
 export const AuthBrowserSessionRequest = Schema.Struct({
-  credential: TrimmedNonEmptyString,
+  /**
+   * Pairing/bootstrap credential. Absent on the local-first bootstrap
+   * attempt: a loopback, same-origin request may be granted an owner
+   * session without a credential (see createLocalBrowserSession).
+   */
+  credential: Schema.optional(TrimmedNonEmptyString),
 });
 export type AuthBrowserSessionRequest = typeof AuthBrowserSessionRequest.Type;
 

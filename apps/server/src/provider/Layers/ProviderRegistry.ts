@@ -713,7 +713,13 @@ export const ProviderRegistryLive = Layer.effect(
       getProviderMaintenanceCapabilitiesForInstance,
       setProviderMaintenanceActionState,
       get streamChanges() {
-        return Stream.fromPubSub(changesPubSub);
+        // Current state first, then live changes: subscribers that attach
+        // after the initial sync still receive providers immediately
+        // instead of waiting for the next background refresh to emit.
+        return Stream.concat(
+          Stream.fromEffect(Ref.get(providersRef)),
+          Stream.fromPubSub(changesPubSub),
+        );
       },
     } satisfies ProviderRegistryShape;
   }),

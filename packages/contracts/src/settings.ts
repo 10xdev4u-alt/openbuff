@@ -484,11 +484,12 @@ export const FreebuffSettings = makeProviderSettingsSchema(
     apiKey: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
-        title: "API key",
-        description: "Codebuff API key. Create one for free at codebuff.com/api-keys.",
+        title: "Auth token override",
+        description:
+          "Optional. Leave empty to reuse your Freebuff CLI login automatically.",
         providerSettingsForm: {
           control: "password",
-          placeholder: "ck_...",
+          placeholder: "Leave empty — uses Freebuff CLI login",
           clearWhenEmpty: "omit",
         },
       }),

@@ -421,6 +421,21 @@ export class EnvironmentAuth extends Context.Service<
       },
       ServerAuthInvalidCredentialError | ServerAuthInternalError
     >;
+    /**
+     * Local-first bootstrap: issues an owner browser session WITHOUT a
+     * credential. Only call this for requests already verified as
+     * loopback + same-origin (see the browserSession HTTP handler) — the
+     * physical machine is the identity, so no pairing token is required.
+     */
+    readonly createLocalBrowserSession: (
+      requestMetadata: AuthClientMetadata,
+    ) => Effect.Effect<
+      {
+        readonly response: AuthBrowserSessionResult;
+        readonly sessionToken: string;
+      },
+      ServerAuthInternalError
+    >;
     readonly exchangeBootstrapCredentialForAccessToken: (
       credential: string,
       requestedScopes: ReadonlyArray<AuthEnvironmentScope> | undefined,
@@ -687,6 +702,37 @@ export const make = Effect.gen(function* () {
       ),
       Effect.withSpan("EnvironmentAuth.createBrowserSession"),
     );
+
+  const createLocalBrowserSession: EnvironmentAuth["Service"]["createLocalBrowserSession"] =
+    (requestMetadata) =>
+      sessions
+        .issue({
+          method: "browser-session-cookie",
+          subject: DEFAULT_SESSION_SUBJECT,
+          scopes: [...AuthStandardClientScopes],
+          client: {
+            ...requestMetadata,
+            label: "Local (loopback)",
+          },
+        })
+        .pipe(
+          Effect.mapError(
+            (cause) => new ServerAuthAuthenticatedSessionIssueError({ cause }),
+          ),
+          Effect.map(
+            (session) =>
+              ({
+                response: {
+                  authenticated: true,
+                  scopes: session.scopes,
+                  sessionMethod: session.method,
+                  expiresAt: DateTime.toUtc(session.expiresAt),
+                } satisfies AuthBrowserSessionResult,
+                sessionToken: session.token,
+              }) satisfies BootstrapExchangeResult,
+          ),
+          Effect.withSpan("EnvironmentAuth.createLocalBrowserSession"),
+        );
 
   const exchangeBootstrapCredentialForAccessToken: EnvironmentAuth["Service"]["exchangeBootstrapCredentialForAccessToken"] =
     (credential, requestedScopes, requestMetadata, input) =>
@@ -965,6 +1011,7 @@ export const make = Effect.gen(function* () {
       Effect.succeed(descriptor).pipe(Effect.withSpan("EnvironmentAuth.getDescriptor")),
     getSessionState,
     createBrowserSession,
+    createLocalBrowserSession,
     exchangeBootstrapCredentialForAccessToken,
     createPairingLink,
     issuePairingCredential,
