@@ -32,6 +32,7 @@
 import {
   CodebuffClient,
   ToolHelpers,
+  type AgentDefinition,
   type ClientToolCall,
   type CodebuffToolOutput,
   type PrintModeEvent,
@@ -67,6 +68,11 @@ import type {
   ProviderThreadSnapshot,
 } from "./ProviderAdapter.ts";
 import type { FreebuffSettings } from "@t3tools/contracts";
+import {
+  establishFreebuffSession,
+  installFreebuffFetchInterceptor,
+  runWithFreebuffSession,
+} from "./FreebuffSession.ts";
 
 export const FREEBUFF_DRIVER_KIND = ProviderDriverKind.make("freebuff");
 
@@ -90,6 +96,12 @@ interface FreebuffSession {
   readonly pendingApprovals: Map<ApprovalRequestId, PendingCommandApproval>;
   /** Flipped by an `acceptForSession` decision: later commands run unasked. */
   autoApproveCommands: boolean;
+  /**
+   * Server-assigned id of the active Freebuff free session, if one has been
+   * admitted. Chat completions must carry it in `codebuff_metadata` or the
+   * backend answers `waiting_room_required`.
+   */
+  freebuffInstanceId: string | undefined;
 }
 
 /** SDK tool name → canonical item type (see TOOL_LIFECYCLE_ITEM_TYPES). */
@@ -122,6 +134,66 @@ function summarizeToolOutput(output: ReadonlyArray<{ type: string; value?: unkno
 
 const nowIso = (): string => Effect.runSync(Effect.map(DateTime.now, DateTime.formatIso));
 
+/**
+ * Local `base-free` agent template.
+ *
+ * The SDK resolves the agent for a run in two ways: a LOCAL template map
+ * (built from `agentDefinitions` / an object-valued `agent`), or a DATABASE
+ * fetch (`/api/v1/agents/{org}/{id}/latest`). Freebuff's free-tier template
+ * `base-free` is NOT a published database agent — that endpoint returns 404
+ * even with a valid token — so any path that falls through to the DB fetch
+ * hangs the run forever. Supplying the definition here (and passing it as an
+ * object to `run()`) registers it as a local template, so resolution succeeds
+ * without touching the network. This mirrors what the real Freebuff CLI does:
+ * it ships these templates locally rather than fetching them.
+ *
+ * The model is the one this account is entitled to (geo-limited free tier).
+ * The system prompt is self-contained: the SDK does NOT substitute the
+ * `{CODEBUFF_*}` placeholders the upstream base3 harness uses, so they are
+ * inlined or dropped here.
+ */
+const FREEBUFF_BASE_FREE_AGENT: AgentDefinition = {
+  // The id MUST be one the Freebuff backend's free-mode allowlist recognizes
+  // (FREE_MODE_AGENT_MODELS in common/src/constants/free-agents.ts). A
+  // non-whitelisted id 403s with free_mode_invalid_agent_model. This is the
+  // root pinned to deepseek/deepseek-v4-flash — the model this account is
+  // entitled to on the geo-limited free tier.
+  id: "base3-free-deepseek-flash",
+  displayName: "Buffy on DeepSeek Flash",
+  model: "deepseek/deepseek-v4-flash",
+  providerOptions: { data_collection: "deny" },
+  outputMode: "last_message",
+  includeMessageHistory: true,
+  inputSchema: {
+    prompt: {
+      type: "string",
+      description: "A coding task to complete",
+    },
+  },
+  toolNames: [
+    "read_files",
+    "str_replace",
+    "write_file",
+    "run_terminal_command",
+    "code_search",
+    "glob",
+    "list_directory",
+    "write_todos",
+    "web_search",
+  ],
+  systemPrompt: `You are Buffy, the coding agent behind Codebuff. You help users with software engineering tasks: fixing bugs, adding functionality, refactoring, and explaining code.
+
+- Match the project's existing conventions. Verify a library is already used in the project before employing it.
+- Prefer editing existing files over creating new ones. Make the fewest changes that address the request.
+- Verify non-trivial changes by running the project's typecheck and relevant tests.
+- Use write_todos to plan and track multi-step tasks.
+- Your responses are displayed in a terminal. Keep them short and concise.
+- Don't run destructive or hard-to-undo commands (git push, resets, deploys) unless the user asks for them.
+
+You are running on the deepseek/deepseek-v4-flash model. You are the AI agent behind Freebuff, a tool where users can chat with you to code with AI for free. See freebuff.com for more information about the product.
+`,
+};
+
 /** Typed wrapper for a rejected SDK run (see Effect.tryPromise below). */
 class FreebuffRunFailure extends Data.TaggedError("FreebuffRunFailure")<{
   readonly cause: unknown;
@@ -140,6 +212,10 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
     // The adapter's lifetime is the driver instance's scope: turns forked
     // from sendTurn live here so registry teardown interrupts in-flight runs.
     const scope = yield* Scope.Scope;
+    // The SDK cannot inject `freebuff_instance_id` into `codebuff_metadata`,
+    // and free-mode chat completions 403/waiting-room without it. The
+    // interceptor merges it in at the transport layer, scoped per turn.
+    installFreebuffFetchInterceptor();
     let eventCount = 0;
     const sessions = new Map<ThreadId, FreebuffSession>();
 
@@ -189,6 +265,7 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
           turns: [],
           pendingApprovals: new Map(),
           autoApproveCommands: false,
+          freebuffInstanceId: undefined,
         });
         return session;
       });
@@ -236,7 +313,53 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
           },
         } as ProviderRuntimeEvent);
 
-        const client = new CodebuffClient({ apiKey: config.apiKey });
+        // ── Free-session admission ────────────────────────────────────────
+        // Free-mode chat completions are gated behind an ACTIVE free session
+        // (the backend answers `waiting_room_required` without one). Admit
+        // once per thread and reuse the server-assigned instance id for every
+        // subsequent turn; re-admit if a previous admission was never made.
+        if (state.freebuffInstanceId === undefined) {
+          const admission = yield* Effect.tryPromise({
+            try: () => establishFreebuffSession(config.apiKey, { signal: abort.signal }),
+            catch: (cause) =>
+              new ProviderAdapterRequestError({
+                provider: "freebuff",
+                method: "sendTurn",
+                detail:
+                  cause instanceof Error
+                    ? cause.message
+                    : "Failed to start a Freebuff free session.",
+              }),
+          });
+          if (admission.status !== "active" || admission.instanceId === undefined) {
+            state.activeTurn = undefined;
+            state.session = { ...state.session, status: "ready", updatedAt: nowIso() };
+            return yield* Effect.fail(
+              new ProviderAdapterRequestError({
+                provider: "freebuff",
+                method: "sendTurn",
+                detail: `Freebuff could not start a free session (${admission.status}). ${admission.message ?? "Try again shortly."}`,
+              }),
+            );
+          }
+          state.freebuffInstanceId = admission.instanceId;
+        }
+
+        const client = new CodebuffClient({
+          apiKey: config.apiKey,
+          // Surface SDK internals on stderr: without a logger the run()
+          // promise can fail silently (invalid agent, auth, network). The SDK
+          // fires these callbacks from promise-land, outside any Effect
+          // runtime, so they go straight to stderr rather than Effect.log*.
+          logger: {
+            debug: () => {},
+            info: () => {},
+            warn: (...args: unknown[]) =>
+              process.stderr.write(`[freebuff-sdk:warn] ${args.map(String).join(" ")}\n`),
+            error: (...args: unknown[]) =>
+              process.stderr.write(`[freebuff-sdk:error] ${args.map(String).join(" ")}\n`),
+          } as never,
+        });
         const prompt = input.input;
         const previousRun = state.runState;
         const cwd = state.session.cwd;
@@ -287,46 +410,54 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
             abort.signal.addEventListener("abort", onAbort, { once: true });
           });
 
+        // The free-session instance id is guaranteed here: admission above
+        // either set it or failed the turn.
+        const freebuffInstanceId = state.freebuffInstanceId as string;
+
         const runEffect = Effect.tryPromise({
           try: () =>
-            client.run({
-              // "base-free" is the SDK's free agent template. Passing an explicit
-              // agent id bypasses costMode-based agent selection, and the default
-              // "base" agent routes to a paid model → 402 on free/geo-limited
-              // accounts. "base-free" routes to the account's assigned free model
-              // (deepseek-v4-flash). costMode is kept for the backend's model
-              // routing as well.
-              agent: "base-free",
-              costMode: "free",
-              prompt,
-              ...(previousRun !== undefined ? { previousRun } : {}),
-              signal: abort.signal,
-              ...(cwd !== undefined ? { cwd } : {}),
-              overrideTools: {
-                run_terminal_command: async (
-                  toolInput: ClientToolCall<"run_terminal_command">["input"],
-                ): Promise<CodebuffToolOutput<"run_terminal_command">> => {
-                  const command = toolInput.command;
-                  // Supervised modes gate every command; full-access and
-                  // sessions that got acceptForSession run unasked.
-                  const needsApproval =
-                    state.session.runtimeMode !== "full-access" && !state.autoApproveCommands;
-                  if (needsApproval && !(await requestCommandApproval(command, toolInput))) {
-                    return {
-                      exitCode: 1,
-                      stdout: "",
-                      stderr: "User declined to run this command.",
-                      cancelled: true,
-                    } as unknown as CodebuffToolOutput<"run_terminal_command">;
-                  }
-                  return ToolHelpers.runTerminalCommand({
-                    command,
-                    process_type: toolInput.process_type === "BACKGROUND" ? "BACKGROUND" : "SYNC",
-                    cwd: toolInput.cwd || cwd || process.cwd(),
-                    timeout_seconds: toolInput.timeout_seconds ?? 120,
-                  });
+            // Run inside the session scope so the fetch interceptor merges
+            // `freebuff_instance_id` into every chat-completion request's
+            // `codebuff_metadata`. Without it the backend answers
+            // `waiting_room_required` and the turn produces nothing.
+            runWithFreebuffSession(freebuffInstanceId, () =>
+              client.run({
+                // Pass the agent as an OBJECT, not a string id. The SDK
+                // registers object agents as local templates (keyed by id) and
+                // resolves them in-process. A string id instead falls through
+                // to a database fetch of a published agent — and the free-mode
+                // roots are not published (404), which hangs the run silently.
+                agent: FREEBUFF_BASE_FREE_AGENT,
+                costMode: "free",
+                prompt,
+                ...(previousRun !== undefined ? { previousRun } : {}),
+                signal: abort.signal,
+                ...(cwd !== undefined ? { cwd } : {}),
+                overrideTools: {
+                  run_terminal_command: async (
+                    toolInput: ClientToolCall<"run_terminal_command">["input"],
+                  ): Promise<CodebuffToolOutput<"run_terminal_command">> => {
+                    const command = toolInput.command;
+                    // Supervised modes gate every command; full-access and
+                    // sessions that got acceptForSession run unasked.
+                    const needsApproval =
+                      state.session.runtimeMode !== "full-access" && !state.autoApproveCommands;
+                    if (needsApproval && !(await requestCommandApproval(command, toolInput))) {
+                      return {
+                        exitCode: 1,
+                        stdout: "",
+                        stderr: "User declined to run this command.",
+                        cancelled: true,
+                      } as unknown as CodebuffToolOutput<"run_terminal_command">;
+                    }
+                    return ToolHelpers.runTerminalCommand({
+                      command,
+                      process_type: toolInput.process_type === "BACKGROUND" ? "BACKGROUND" : "SYNC",
+                      cwd: toolInput.cwd || cwd || process.cwd(),
+                      timeout_seconds: toolInput.timeout_seconds ?? 120,
+                    });
+                  },
                 },
-              },
               handleStreamChunk: (chunk) => {
                 if (typeof chunk === "string") {
                   if (chunk) {
@@ -348,6 +479,13 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
                 }
               },
               handleEvent: (event: PrintModeEvent) => {
+                // Error events are the ones that would otherwise vanish; the
+                // SDK reports agent failures here rather than rejecting run().
+                if (event.type === "error" || event.type === "prompt-error") {
+                  process.stderr.write(
+                    `[freebuff-sdk:event] ${JSON.stringify(event).slice(0, 400)}\n`,
+                  );
+                }
                 if (event.type === "tool_call") {
                   emitFromCallback({
                     ...baseEvent(threadId, turnId),
@@ -371,7 +509,8 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
                   } as ProviderRuntimeEvent);
                 }
               },
-            }),
+              })
+            ),
           catch: (cause) => new FreebuffRunFailure({ cause }),
         });
 
