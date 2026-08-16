@@ -51,7 +51,7 @@ export function formatServiceStatus(
     return "OpenBuff service\n  Status: unavailable on this machine\n  Supported on: Linux with systemd";
   }
   if (!status.installed) {
-    return "OpenBuff service\n  Status: not installed\n  Next: Run `t3 service install`.";
+    return "OpenBuff service\n  Status: not installed\n  Next: Run `openbuff service install`.";
   }
   return [
     "OpenBuff service",

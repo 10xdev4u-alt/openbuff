@@ -23,8 +23,6 @@ import serverPackageJson from "../package.json" with { type: "json" };
 import {
   ServerCliBuildAssetMissingError,
   ServerCliCommandExitError,
-  ServerCliDevelopmentIconSourceMissingError,
-  ServerCliDevelopmentIconTargetMissingError,
   ServerCliPublishIconSourceMissingError,
   ServerCliPublishIconTargetMissingError,
 } from "./cliErrors.ts";
@@ -124,10 +122,16 @@ const applyDevelopmentIconOverrides = Effect.fn("applyDevelopmentIconOverrides")
     const targetPath = path.join(serverDir, override.targetRelativePath);
 
     if (!(yield* fs.exists(sourcePath))) {
-      return yield* new ServerCliDevelopmentIconSourceMissingError({ sourcePath });
+      yield* Effect.logWarning(
+        `[cli] Skipping icon override — source missing: ${sourcePath}`,
+      );
+      continue;
     }
     if (!(yield* fs.exists(targetPath))) {
-      return yield* new ServerCliDevelopmentIconTargetMissingError({ targetPath });
+      yield* Effect.logWarning(
+        `[cli] Skipping icon override — target missing: ${targetPath}`,
+      );
+      continue;
     }
 
     yield* fs.copyFile(sourcePath, targetPath);

@@ -63,9 +63,29 @@ export const CLI_BUILD_ONLY_EXTERNAL_PREFIXES = [
   "@effect/sql-sqlite-bun",
 ] as const;
 
+/**
+ * External because they resolve assets from their own install location at
+ * runtime, but whose dependency closure does NOT need to be individually
+ * external.
+ *
+ * Unlike the native packages above — which get minimally staged into a desktop
+ * sidecar, so every one of their dependencies must also be external — these are
+ * self-contained published packages. When left external, Node loads them from
+ * the real filesystem and the package manager has already installed their whole
+ * dependency tree alongside them, so their internal `require`/`require.resolve`
+ * calls resolve normally. Inlining them is what breaks: it relocates those
+ * lookups into the bundle, where the packages are unreachable.
+ *
+ * The Freebuff SDK resolves WASM assets (web-tree-sitter, quickjs, vscode
+ * tree-sitter grammars) by real path at runtime via `require.resolve` from its
+ * own module location, so it must stay external.
+ */
+export const CLI_SELF_CONTAINED_EXTERNAL_PREFIXES = ["@codebuff/sdk"] as const;
+
 export const CLI_EXTERNAL_PACKAGE_PREFIXES = [
   ...CLI_RUNTIME_EXTERNAL_PREFIXES,
   ...CLI_BUILD_ONLY_EXTERNAL_PREFIXES,
+  ...CLI_SELF_CONTAINED_EXTERNAL_PREFIXES,
 ] as const;
 
 export function isRuntimeExternalCliDependency(id: string): boolean {

@@ -60,6 +60,13 @@ describe("shouldBundleCliDependency", () => {
     assert.strictEqual(shouldBundleCliDependency("@effect/sql-sqlite-bun"), false);
   });
 
+  // The SDK resolves WASM assets by real path from its own install location at
+  // runtime, so it must never be inlined — but unlike the native packages its
+  // dependency closure installs as a unit and does not need individual entries.
+  it("leaves self-contained runtime-resolving packages external", () => {
+    assert.strictEqual(shouldBundleCliDependency("@codebuff/sdk"), false);
+  });
+
   // The real package is `node-gyp-build-optional-packages`, reached by prefix.
   // It is transitive to a selected dependency root, so the runtime closure test
   // below ensures it follows that root into the sidecar.

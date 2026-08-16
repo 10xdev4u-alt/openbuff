@@ -36,7 +36,7 @@ const connectUnavailableCommand = Command.make("connect", {
   Command.withHandler(() =>
     Effect.fail(
       new CliError.ShowHelp({
-        commandPath: ["t3", "connect"],
+        commandPath: ["openbuff", "connect"],
         errors: [new ConnectPublicConfigMissingError({ cause: connectPublicConfigMissingMessage })],
       }),
     ),
@@ -44,7 +44,7 @@ const connectUnavailableCommand = Command.make("connect", {
 );
 
 export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
-  Command.make("t3", { ...sharedServerCommandFlags }).pipe(
+  Command.make("openbuff", { ...sharedServerCommandFlags }).pipe(
     Command.withDescription("Run the OpenBuff server."),
     Command.withHandler((flags) => runServerCommand(flags)),
     Command.withSubcommands([

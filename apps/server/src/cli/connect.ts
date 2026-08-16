@@ -192,9 +192,9 @@ function formatCloudStatus(status: CloudCliStatus, options?: { readonly json?: b
       ? "pending server startup"
       : "not provisioned";
   const nextStep = !status.authenticated
-    ? "Run `t3 connect link` to authorize and enable T3 Connect."
+    ? "Run `openbuff connect link` to authorize and enable T3 Connect."
     : !status.desired
-      ? "Run `t3 connect link` to enable T3 Connect."
+      ? "Run `openbuff connect link` to enable T3 Connect."
       : !status.linked
         ? "Start T3 to provision the environment link and launch its managed tunnel."
         : undefined;
@@ -382,7 +382,7 @@ export const reportCloudDisconnectResults = Effect.fn("cloud.cli.report_disconne
       yield* Console.warn(
         input.clearAuthorization
           ? "Could not revoke the relay-side environment record before signing out.\nThe stored CLI authorization was still removed locally."
-          : "Could not revoke the relay-side environment record yet.\nRun `t3 connect unlink` again when the relay is reachable.",
+          : "Could not revoke the relay-side environment record yet.\nRun `openbuff connect unlink` again when the relay is reachable.",
       );
     } else if (input.relayResult.value.status === "revoked") {
       yield* Console.log("Revoked the relay-side environment record.");
@@ -631,7 +631,7 @@ const connectPublishCommand = Command.make("publish", {
         // out of band without T3 Connect.
         if (!(yield* tokens.hasCredential)) {
           yield* Console.log(
-            "Run `t3 connect login` first so this environment can be authorized to publish.",
+            "Run `openbuff connect login` first so this environment can be authorized to publish.",
           );
           return;
         }

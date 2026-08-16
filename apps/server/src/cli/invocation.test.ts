@@ -42,33 +42,33 @@ it("treats stable installs as direct invocations", () => {
 });
 
 it("re-suggests the nightly channel only for nightly builds", () => {
-  assert.equal(suggestedPackageSpec("0.0.31-nightly.20260729"), "t3@nightly");
-  assert.equal(suggestedPackageSpec("0.0.31"), "t3");
+  assert.equal(suggestedPackageSpec("0.0.31-nightly.20260729"), "openbuff@nightly");
+  assert.equal(suggestedPackageSpec("0.0.31"), "openbuff");
 });
 
 it("formats serve suggestions to match the launching command", () => {
   assert.equal(
     formatCliCommand({
       subcommand: "serve",
-      entryPath: "/home/theo/.npm/_npx/abc/node_modules/t3/dist/bin.mjs",
+      entryPath: "/home/theo/.npm/_npx/abc/node_modules/openbuff/dist/bin.mjs",
       version: "0.0.31-nightly.20260729",
     }),
-    "npx t3@nightly serve",
+    "npx openbuff@nightly serve",
   );
   assert.equal(
     formatCliCommand({
       subcommand: "serve",
-      entryPath: "/tmp/bunx-1000-t3@latest/node_modules/t3/dist/bin.mjs",
+      entryPath: "/tmp/bunx-1000-openbuff@latest/node_modules/openbuff/dist/bin.mjs",
       version: "0.0.31",
     }),
-    "bunx t3 serve",
+    "bunx openbuff serve",
   );
   assert.equal(
     formatCliCommand({
       subcommand: "serve",
-      entryPath: "/usr/local/lib/node_modules/t3/dist/bin.mjs",
+      entryPath: "/usr/local/lib/node_modules/openbuff/dist/bin.mjs",
       version: "0.0.31-nightly.20260729",
     }),
-    "t3 serve",
+    "openbuff serve",
   );
 });
