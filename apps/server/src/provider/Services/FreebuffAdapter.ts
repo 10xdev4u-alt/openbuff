@@ -290,14 +290,18 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
         const runEffect = Effect.tryPromise({
           try: () =>
             client.run({
-              agent: config.agent,
+              // "base-free" is the SDK's free agent template. Passing an explicit
+              // agent id bypasses costMode-based agent selection, and the default
+              // "base" agent routes to a paid model → 402 on free/geo-limited
+              // accounts. "base-free" routes to the account's assigned free model
+              // (deepseek-v4-flash). costMode is kept for the backend's model
+              // routing as well.
+              agent: "base-free",
+              costMode: "free",
               prompt,
               ...(previousRun !== undefined ? { previousRun } : {}),
               signal: abort.signal,
               ...(cwd !== undefined ? { cwd } : {}),
-              // No model override: free-tier accounts are pinned to the model
-              // the backend assigns (deepseek-v4-flash). Passing a paid model
-              // slug triggers a 402 "Out of credits" rejection.
               overrideTools: {
                 run_terminal_command: async (
                   toolInput: ClientToolCall<"run_terminal_command">["input"],
