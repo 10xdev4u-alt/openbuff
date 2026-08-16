@@ -295,7 +295,9 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
               ...(previousRun !== undefined ? { previousRun } : {}),
               signal: abort.signal,
               ...(cwd !== undefined ? { cwd } : {}),
-              ...(modelSelection !== undefined ? { params: { model: modelSelection } } : {}),
+              // No model override: free-tier accounts are pinned to the model
+              // the backend assigns (deepseek-v4-flash). Passing a paid model
+              // slug triggers a 402 "Out of credits" rejection.
               overrideTools: {
                 run_terminal_command: async (
                   toolInput: ClientToolCall<"run_terminal_command">["input"],
@@ -400,6 +402,19 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
                 const aborted =
                   abort.signal.aborted ||
                   (cause instanceof Error && cause.name === "AbortError");
+                // The backend returns 402 "Out of credits" when a paid model is
+                // requested on a free/limited account. Surface a clear,
+                // actionable message instead of the raw SDK error text.
+                const causeText = cause instanceof Error ? cause.message : String(cause);
+                const isOutOfCredits =
+                  /out of credits/i.test(causeText) ||
+                  /402/.test(causeText) ||
+                  (cause instanceof Error &&
+                    "statusCode" in cause &&
+                    (cause as { statusCode?: number }).statusCode === 402);
+                const errorMessage = isOutOfCredits
+                  ? "This model requires credits your account doesn't have. Free-tier accounts are limited to the models Freebuff assigns (currently DeepSeek V4 Flash). Switch back to the default model, or add credits at codebuff.com/usage."
+                  : causeText;
                 const failureEffect = aborted
                   ? emit({
                       ...baseEvent(threadId, turnId),
@@ -411,7 +426,7 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
                       type: "turn.completed",
                       payload: {
                         state: "failed",
-                        errorMessage: cause instanceof Error ? cause.message : String(cause),
+                        errorMessage,
                       },
                     } as ProviderRuntimeEvent);
                 return Effect.sync(() => {
