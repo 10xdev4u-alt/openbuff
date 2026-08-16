@@ -1,6 +1,6 @@
 # Mobile appearance
 
-T3 Code Mobile includes the T3 Code, T3 Chat, Grove, Ocean, Ember, and Iris themes. Each theme has
+OpenBuff Mobile includes the OpenBuff, T3 Chat, Grove, Ocean, Ember, and Iris themes. Each theme has
 light and dark colors that apply throughout the app, including code reviews, file previews, the
 terminal, native headers, and sheets.
 
