@@ -29,12 +29,21 @@
  *
  * @module provider/Services/FreebuffAdapter
  */
-import { CodebuffClient, type PrintModeEvent, type RunState } from "@codebuff/sdk";
 import {
+  CodebuffClient,
+  ToolHelpers,
+  type ClientToolCall,
+  type CodebuffToolOutput,
+  type PrintModeEvent,
+  type RunState,
+} from "@codebuff/sdk";
+import {
+  ApprovalRequestId,
   EventId,
   ProviderDriverKind,
   ThreadId,
   TurnId,
+  type ProviderApprovalDecision,
   type ProviderRuntimeEvent,
   type ProviderSession,
   type ProviderTurnStartResult,
@@ -48,6 +57,7 @@ import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 
 import {
+  ProviderAdapterRequestError,
   ProviderAdapterSessionNotFoundError,
   ProviderAdapterValidationError,
   type ProviderAdapterError,
@@ -65,11 +75,21 @@ export interface MakeFreebuffAdapterOptions {
   readonly instanceId: string;
 }
 
+/** A command approval parked while the web UI decides (see #4). */
+interface PendingCommandApproval {
+  readonly resolve: (approved: boolean) => void;
+  readonly command: string;
+}
+
 interface FreebuffSession {
   session: ProviderSession;
   runState: RunState | undefined;
   activeTurn: { readonly turnId: TurnId; readonly abort: AbortController } | undefined;
   readonly turns: Array<{ readonly id: TurnId; items: unknown[] }>;
+  /** Parked command approvals keyed by request id (web UI respondToRequest). */
+  readonly pendingApprovals: Map<ApprovalRequestId, PendingCommandApproval>;
+  /** Flipped by an `acceptForSession` decision: later commands run unasked. */
+  autoApproveCommands: boolean;
 }
 
 /** SDK tool name → canonical item type (see TOOL_LIFECYCLE_ITEM_TYPES). */
@@ -167,6 +187,8 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
           runState: undefined,
           activeTurn: undefined,
           turns: [],
+          pendingApprovals: new Map(),
+          autoApproveCommands: false,
         });
         return session;
       });
@@ -222,6 +244,49 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
 
         let assistantText = "";
 
+        // ── Command approval bridge (#4) ────────────────────────────────
+        // Parks an approval on a promise the web UI resolves via
+        // respondToRequest; auto-denies if the turn is interrupted.
+        const requestCommandApproval = (
+          command: string,
+          rawInput: unknown,
+        ): Promise<boolean> =>
+          new Promise<boolean>((resolve) => {
+            const requestId = ApprovalRequestId.make(`freebuff-req-${newUuid()}`);
+            state.pendingApprovals.set(requestId, {
+              resolve: (approved) => {
+                if (approved) state.autoApproveCommands = true;
+                resolve(approved);
+              },
+              command,
+            });
+            emitFromCallback({
+              ...baseEvent(threadId, turnId),
+              requestId,
+              type: "request.opened",
+              payload: {
+                requestType: "command_execution_approval",
+                detail: command,
+                args: rawInput,
+              },
+            } as unknown as ProviderRuntimeEvent);
+            const onAbort = () => {
+              if (state.pendingApprovals.delete(requestId)) {
+                emitFromCallback({
+                  ...baseEvent(threadId, turnId),
+                  requestId,
+                  type: "request.resolved",
+                  payload: {
+                    requestType: "command_execution_approval",
+                    decision: "cancel",
+                  },
+                } as unknown as ProviderRuntimeEvent);
+                resolve(false);
+              }
+            };
+            abort.signal.addEventListener("abort", onAbort, { once: true });
+          });
+
         const runEffect = Effect.tryPromise({
           try: () =>
             client.run({
@@ -231,6 +296,31 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
               signal: abort.signal,
               ...(cwd !== undefined ? { cwd } : {}),
               ...(modelSelection !== undefined ? { params: { model: modelSelection } } : {}),
+              overrideTools: {
+                run_terminal_command: async (
+                  toolInput: ClientToolCall<"run_terminal_command">["input"],
+                ): Promise<CodebuffToolOutput<"run_terminal_command">> => {
+                  const command = toolInput.command;
+                  // Supervised modes gate every command; full-access and
+                  // sessions that got acceptForSession run unasked.
+                  const needsApproval =
+                    state.session.runtimeMode !== "full-access" && !state.autoApproveCommands;
+                  if (needsApproval && !(await requestCommandApproval(command, toolInput))) {
+                    return {
+                      exitCode: 1,
+                      stdout: "",
+                      stderr: "User declined to run this command.",
+                      cancelled: true,
+                    } as unknown as CodebuffToolOutput<"run_terminal_command">;
+                  }
+                  return ToolHelpers.runTerminalCommand({
+                    command,
+                    process_type: toolInput.process_type === "BACKGROUND" ? "BACKGROUND" : "SYNC",
+                    cwd: toolInput.cwd || cwd || process.cwd(),
+                    timeout_seconds: toolInput.timeout_seconds ?? 120,
+                  });
+                },
+              },
               handleStreamChunk: (chunk) => {
                 if (typeof chunk === "string") {
                   if (chunk) {
@@ -356,14 +446,41 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
 
     const respondToRequest: ProviderAdapterShape<ProviderAdapterError>["respondToRequest"] = (
       threadId,
+      requestId,
+      decision,
     ) =>
       Effect.suspend(() => {
-        if (!sessions.has(threadId)) {
+        const state = sessions.get(threadId);
+        if (!state) {
           return Effect.fail<ProviderAdapterError>(sessionNotFound(threadId));
         }
-        // Interactive approvals need the overrideTools interception (#4);
-        // recorded decisions have no in-flight SDK turn to deliver to yet.
-        return Effect.void;
+        const pending = state.pendingApprovals.get(requestId);
+        if (!pending) {
+          return Effect.fail(
+            new ProviderAdapterRequestError({
+              provider: "freebuff",
+              method: "respondToRequest",
+              detail: `No pending approval '${String(requestId)}' on this thread.`,
+            }),
+          );
+        }
+        state.pendingApprovals.delete(requestId);
+        const approved = decision === "accept" || decision === "acceptForSession";
+        return emit({
+          ...baseEvent(threadId, state.activeTurn?.turnId),
+          requestId,
+          type: "request.resolved",
+          payload: {
+            requestType: "command_execution_approval",
+            decision,
+          },
+        } as unknown as ProviderRuntimeEvent).pipe(
+          Effect.andThen(
+            Effect.sync(() => {
+              pending.resolve(approved);
+            }),
+          ),
+        );
       });
 
     const respondToUserInput: ProviderAdapterShape<ProviderAdapterError>["respondToUserInput"] = (
