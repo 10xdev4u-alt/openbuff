@@ -5,6 +5,54 @@
 /* Window Controls Overlay: active when Electron exposes native titlebar control geometry. */
 @custom-variant wco (&:is(.wco, .wco *));
 
+/* Self-hosted variable fonts (SIL OFL — see public/fonts/OFL.txt). Latin subset,
+   woff2, variable weight. No CDN dependency. */
+@font-face {
+  font-family: "Inter Tight";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/inter-tight-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/inter-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/jetbrains-mono-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: italic;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/jetbrains-mono-latin-italic.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Bodoni Moda";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/fonts/bodoni-moda-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /* On mobile, morph the expanded hero composer into the compact docked
    composer while it moves; the rest of the app remains visually stationary. */
 html[data-mobile-composer-route-transition="true"]::view-transition-old(root),
@@ -104,6 +152,19 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --workspace-titlebar-control-size: 1.75rem;
   --workspace-titlebar-control-gap: 0.75rem;
 
+  /* M3 Expressive motion tokens. Easings mirror Material's emphasized curves;
+     durations are the canonical M3 values. `--motion-scale` lets reduced-motion
+     mode shorten every duration without touching each call site. */
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --motion-scale: 1;
+  --duration-nav: calc(380ms * var(--motion-scale));
+  --duration-sheet: calc(340ms * var(--motion-scale));
+  --duration-fade: calc(200ms * var(--motion-scale));
+  --duration-micro: calc(140ms * var(--motion-scale));
+
   @variant dark {
     --app-scrollbar-thumb: rgb(255 255 255 / 8%);
     --app-scrollbar-thumb-hover: rgb(255 255 255 / 12%);
@@ -126,11 +187,17 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 
 /* The font tokens are declared outside the inline theme so utilities reference
    the variables and Settings -> Appearance can override them at runtime. The
-   default stacks are mirrored in `appearanceFonts.ts`. */
+   default stacks are mirrored in `appearanceFonts.ts`. M3 Expressive type:
+   Inter for body/UI, Inter Tight for display/headlines, JetBrains Mono for
+   code/terminal/diffs, Bodoni Moda as the expressive display serif. */
 @theme {
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-display: "Inter Tight", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    system-ui, sans-serif;
+  --font-serif: "Bodoni Moda", ui-serif, Georgia, "Times New Roman", serif;
   --font-mono:
-    ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    "JetBrains Mono", ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas,
+    "Liberation Mono", monospace;
 }
 
 @theme inline {
@@ -190,13 +257,17 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --color-sidebar-row-active: var(--sidebar-row-active);
   --color-sidebar-row-selected: var(--sidebar-row-selected);
   --color-sidebar-border: var(--sidebar-border);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+  /* M3 Expressive shape scale: XS 8 · SM 12 · MD 16 · LG 20 · XL 28 · pill.
+     Rounder than the legacy 10px base; the full pill is available via
+     `rounded-full`. */
+  --radius-xs: 0.5rem;
+  --radius-sm: 0.75rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.75rem;
+  --radius-2xl: 2rem;
+  --radius-3xl: 2.5rem;
+  --radius-4xl: 3rem;
   @keyframes skeleton {
     /* Transform-only so the highlight sweep stays on the compositor, then a
        long hold with the band parked off-screen instead of a constant shimmer. */
@@ -1014,7 +1085,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 
 :root {
   color-scheme: light;
-  --radius: 0.625rem;
+  /* M3 Expressive base radius = MD (16px). The full shape scale lives in the
+     `--radius-*` tokens; direct `var(--radius)` references get the MD shape. */
+  --radius: 1rem;
   --background: var(--color-zinc-25);
   --app-chrome-background: var(--background);
   --toolbar-background: var(--app-chrome-background);
@@ -1029,7 +1102,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --card-foreground: var(--color-zinc-800);
   --popover: var(--color-white);
   --popover-foreground: var(--color-zinc-800);
-  --primary: oklch(0.488 0.217 264);
+  --primary: oklch(0.58 0.15 55);
   --primary-foreground: var(--color-white);
   --secondary: var(--color-zinc-50);
   --secondary-foreground: var(--color-zinc-800);
@@ -1092,7 +1165,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --card-foreground: var(--color-neutral-100);
     --popover: color-mix(in srgb, var(--background) 94%, var(--color-white));
     --popover-foreground: var(--color-neutral-100);
-    --primary: oklch(0.571 0.21 264);
+    --primary: oklch(0.78 0.12 60);
     --secondary: --alpha(var(--color-white) / 4%);
     --secondary-foreground: var(--color-neutral-100);
     --muted: --alpha(var(--color-white) / 4%);
@@ -1119,6 +1192,32 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --terminal-cursor: rgb(180 203 255);
     --terminal-selection-background: rgb(180 203 255 / 25%);
   }
+}
+
+/* M3 Expressive motion modes. Reduced motion shortens every duration to a
+   third (via --motion-scale); off disables animation and transition
+   wholesale. The OS preference is honored by default; an in-app setting can
+   override it via [data-motion]. Durations flow through --motion-scale, so
+   the duty-cycled status/ghost animations stay intact — only their period
+   changes. */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion="full"]) {
+    --motion-scale: 0.333;
+  }
+}
+html[data-motion="reduced"] {
+  --motion-scale: 0.333;
+}
+html[data-motion="off"] {
+  --motion-scale: 0;
+}
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* Keep both sidebar implementations (default and legacy) on the same quiet
@@ -1165,6 +1264,91 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --sidebar-row-selected: color-mix(in srgb, var(--foreground) 7%, transparent);
     --sidebar-border: var(--border);
     --sidebar-stage-fade: var(--card);
+  }
+}
+
+/* Material 3 Expressive color roles, seeded from the OpenBuff buff-orange.
+   This is a standalone `--m3-*` namespace mirroring YATA's exact role
+   structure (primary/secondary/tertiary + on/container pairs, the
+   surfaceContainerLowest→Highest ramp, outline/outlineVariant) so components
+   can adopt M3 roles incrementally without disturbing the legacy semantic
+   tokens or the theme engine above. Light + dark are both defined. */
+:root {
+  /* Primary — buff-orange seed. */
+  --m3-primary: oklch(0.58 0.15 55);
+  --m3-on-primary: oklch(0.985 0.005 80);
+  --m3-primary-container: oklch(0.93 0.06 65);
+  --m3-on-primary-container: oklch(0.32 0.09 50);
+  /* Secondary — warm lime. */
+  --m3-secondary: oklch(0.55 0.12 130);
+  --m3-on-secondary: oklch(0.985 0.01 130);
+  --m3-secondary-container: oklch(0.93 0.07 130);
+  --m3-on-secondary-container: oklch(0.3 0.07 130);
+  /* Tertiary — lavender. */
+  --m3-tertiary: oklch(0.58 0.11 300);
+  --m3-on-tertiary: oklch(0.985 0.008 300);
+  --m3-tertiary-container: oklch(0.93 0.05 300);
+  --m3-on-tertiary-container: oklch(0.32 0.07 300);
+  /* Error. */
+  --m3-error: oklch(0.55 0.2 27);
+  --m3-on-error: oklch(0.985 0.005 27);
+  --m3-error-container: oklch(0.93 0.06 27);
+  --m3-on-error-container: oklch(0.32 0.1 27);
+  /* Surfaces — warm cream ramp. */
+  --m3-background: oklch(0.985 0.006 80);
+  --m3-on-background: oklch(0.24 0.01 60);
+  --m3-surface: oklch(0.985 0.006 80);
+  --m3-on-surface: oklch(0.24 0.01 60);
+  --m3-surface-variant: oklch(0.94 0.012 70);
+  --m3-on-surface-variant: oklch(0.45 0.015 60);
+  --m3-surface-container-lowest: oklch(1 0 0);
+  --m3-surface-container-low: oklch(0.97 0.007 78);
+  --m3-surface-container: oklch(0.955 0.008 76);
+  --m3-surface-container-high: oklch(0.94 0.009 74);
+  --m3-surface-container-highest: oklch(0.925 0.01 72);
+  /* Outlines. */
+  --m3-outline: oklch(0.62 0.015 60);
+  --m3-outline-variant: oklch(0.86 0.01 70);
+  /* Inverse + elevation. */
+  --m3-inverse-surface: oklch(0.3 0.012 60);
+  --m3-inverse-on-surface: oklch(0.95 0.006 75);
+  --m3-inverse-primary: oklch(0.82 0.1 60);
+  --m3-scrim: oklch(0 0 0);
+  --m3-shadow: oklch(0 0 0);
+
+  @variant dark {
+    --m3-primary: oklch(0.78 0.12 60);
+    --m3-on-primary: oklch(0.3 0.09 50);
+    --m3-primary-container: oklch(0.45 0.12 52);
+    --m3-on-primary-container: oklch(0.93 0.06 65);
+    --m3-secondary: oklch(0.76 0.11 130);
+    --m3-on-secondary: oklch(0.28 0.07 130);
+    --m3-secondary-container: oklch(0.42 0.09 130);
+    --m3-on-secondary-container: oklch(0.93 0.07 130);
+    --m3-tertiary: oklch(0.78 0.1 300);
+    --m3-on-tertiary: oklch(0.3 0.07 300);
+    --m3-tertiary-container: oklch(0.44 0.09 300);
+    --m3-on-tertiary-container: oklch(0.93 0.05 300);
+    --m3-error: oklch(0.75 0.16 27);
+    --m3-on-error: oklch(0.3 0.1 27);
+    --m3-error-container: oklch(0.44 0.13 27);
+    --m3-on-error-container: oklch(0.93 0.06 27);
+    --m3-background: oklch(0.18 0.008 60);
+    --m3-on-background: oklch(0.92 0.006 75);
+    --m3-surface: oklch(0.18 0.008 60);
+    --m3-on-surface: oklch(0.92 0.006 75);
+    --m3-surface-variant: oklch(0.32 0.012 60);
+    --m3-on-surface-variant: oklch(0.75 0.012 70);
+    --m3-surface-container-lowest: oklch(0.13 0.007 60);
+    --m3-surface-container-low: oklch(0.2 0.008 60);
+    --m3-surface-container: oklch(0.23 0.009 60);
+    --m3-surface-container-high: oklch(0.26 0.01 60);
+    --m3-surface-container-highest: oklch(0.3 0.011 60);
+    --m3-outline: oklch(0.58 0.013 65);
+    --m3-outline-variant: oklch(0.36 0.011 60);
+    --m3-inverse-surface: oklch(0.92 0.006 75);
+    --m3-inverse-on-surface: oklch(0.28 0.01 60);
+    --m3-inverse-primary: oklch(0.5 0.13 53);
   }
 }
 
