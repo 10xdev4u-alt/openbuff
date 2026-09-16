@@ -79,6 +79,7 @@ jobs:
     name: Specialist review notice
     runs-on: ubuntu-latest
     needs: [classify]
+    if: github.event.action == 'opened' || github.event.action == 'ready_for_review'
     steps:
       - uses: actions/checkout@v4
         with:
