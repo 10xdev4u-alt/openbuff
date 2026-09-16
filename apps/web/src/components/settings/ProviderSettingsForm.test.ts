@@ -11,44 +11,43 @@ import {
 
 describe("ProviderSettingsForm helpers", () => {
   it("derives visible provider config fields from the client definition schema", () => {
-    const codex = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("codex")];
+    const freebuff = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("freebuff")];
 
-    expect(codex).toBeDefined();
-    expect(deriveProviderSettingsFields(codex!).map((field) => field.key)).toEqual([
-      "binaryPath",
-      "homePath",
-      "shadowHomePath",
-      "launchArgs",
+    expect(freebuff).toBeDefined();
+    expect(deriveProviderSettingsFields(freebuff!).map((field) => field.key)).toEqual([
+      "apiKey",
+      "agent",
+      "model",
     ]);
   });
 
   it("sources labels and descriptions from schema annotations", () => {
-    const opencode = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("opencode")];
-    expect(opencode).toBeDefined();
+    const freebuff = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("freebuff")];
+    expect(freebuff).toBeDefined();
 
-    const serverPassword = deriveProviderSettingsFields(opencode!).find(
-      (field) => field.key === "serverPassword",
+    const apiKey = deriveProviderSettingsFields(freebuff!).find(
+      (field) => field.key === "apiKey",
     );
 
-    expect(serverPassword).toMatchObject({
-      label: "Server password",
-      description: "Stored in plain text on disk.",
+    expect(apiKey).toMatchObject({
+      label: "Auth token override",
+      description: "Optional. Leave empty to reuse your Freebuff CLI login automatically.",
       control: "password",
     });
   });
 
   it("preserves unknown config keys while omitting empty configurable fields", () => {
-    const opencode = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("opencode")];
-    expect(opencode).toBeDefined();
+    const freebuff = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("freebuff")];
+    expect(freebuff).toBeDefined();
 
-    const serverUrl = deriveProviderSettingsFields(opencode!).find(
-      (field) => field.key === "serverUrl",
+    const model = deriveProviderSettingsFields(freebuff!).find(
+      (field) => field.key === "model",
     );
-    expect(serverUrl).toBeDefined();
+    expect(model).toBeDefined();
 
     const next = nextProviderConfigWithFieldValue(
-      { forkOwned: 1, serverUrl: "http://127.0.0.1:4096" },
-      serverUrl!,
+      { forkOwned: 1, model: "test/model-slug" },
+      model!,
       "",
     );
 

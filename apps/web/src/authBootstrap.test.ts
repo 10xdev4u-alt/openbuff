@@ -249,6 +249,8 @@ describe("resolveInitialServerAuthGateState", () => {
       request,
       new Response("Bad Gateway", { status: 502 }),
     );
+    // Local servers no longer require pairing: after the transient failures
+    // drain, the session establishes and the gate resolves authenticated.
     const runner: PrimaryHttpEffectRunner = async <A>() => {
       attempts += 1;
       if (attempts < 4) {
@@ -256,7 +258,7 @@ describe("resolveInitialServerAuthGateState", () => {
           reason: new HttpClientError.StatusCodeError({ request, response }),
         });
       }
-      return unauthenticatedSession(LOOPBACK_AUTH) as A;
+      return authenticatedSession(LOOPBACK_AUTH) as A;
     };
     __setPrimaryHttpRunnerForTests(runner);
 
@@ -266,8 +268,7 @@ describe("resolveInitialServerAuthGateState", () => {
     await vi.advanceTimersByTimeAsync(2_000);
 
     await expect(gateStatePromise).resolves.toEqual({
-      status: "requires-auth",
-      auth: LOOPBACK_AUTH,
+      status: "authenticated",
     });
     expect(attempts).toBe(4);
   });
@@ -289,14 +290,25 @@ describe("resolveInitialServerAuthGateState", () => {
     expect(testWindow.location.searchParams.get("token")).toBeNull();
   });
 
-  it("allows manual token submission after the initial auth check requires pairing", async () => {
-    const nextSession = sequence(
-      unauthenticatedSession(LOOPBACK_AUTH),
-      authenticatedSession(LOOPBACK_AUTH),
-    );
+  it("falls back to manual token submission when silent bootstrap is rejected", async () => {
+    // Local servers bootstrap silently; when the server rejects the anonymous
+    // browser-session exchange (remote origin, revoked access), the manual
+    // pairing-token path takes over.
+    const rejectedBootstrap = new EnvironmentAuthInvalidError({
+      code: "auth_invalid",
+      reason: "invalid_credential",
+      traceId: "trace-silent-reject",
+    });
+    let sessionCalls = 0;
     const testApi = await installAuthApi({
-      session: nextSession,
-      browserSession: () => Effect.succeed(browserSession(["orchestration:read"])),
+      session: () =>
+        sessionCalls++ === 0
+          ? unauthenticatedSession(LOOPBACK_AUTH)
+          : authenticatedSession(LOOPBACK_AUTH),
+      browserSession: (credential: string) =>
+        credential === "retry-token"
+          ? Effect.succeed(browserSession(["orchestration:read"]))
+          : Effect.fail(rejectedBootstrap),
     });
     const { resolveInitialServerAuthGateState, submitServerAuthCredential } =
       await import("./environments/primary");
@@ -309,7 +321,12 @@ describe("resolveInitialServerAuthGateState", () => {
     await expect(resolveInitialServerAuthGateState()).resolves.toEqual({
       status: "authenticated",
     });
-    expect(testApi.calls.browserSession).toEqual([{ credential: "retry-token" }]);
+    expect(testApi.calls.browserSession).toEqual([
+      {}, // silent bootstrap: empty payload
+      { credential: "retry-token" }, // manual pairing exchange
+    ]);
+    // initial check + one poll in the post-exchange wait loop; the
+    // authenticated result is cached, so no third fetch happens.
     expect(testApi.calls.session).toBe(2);
   });
 
