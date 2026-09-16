@@ -7,6 +7,8 @@ import {
   resolveDevBindHost,
   V4_WILDCARD_HOST,
   V6_WILDCARD_HOST,
+  type BindableServer,
+  type V6ProbeServerFactory,
 } from "./devBindHost.ts";
 
 describe("resolveDevBindHost", () => {
@@ -44,10 +46,81 @@ describe("probeV6WildcardSupport", () => {
     vi.restoreAllMocks();
   });
 
-  it("reports true when a v6 wildcard bind succeeds", async () => {
+  /** Deterministic fake server: queued "events", recorded calls, no host dependency. */
+  function makeFakeServer(): {
+    server: BindableServer;
+    emitError: (error: Error) => void;
+    emitListen: () => void;
+    calls: { host: string; port: number; closed: boolean };
+  } {
+    let errorHandler: ((error: Error) => void) | undefined;
+    let listenCallback: (() => void) | undefined;
+    const calls = { host: "", port: -1, closed: false };
+    const server: BindableServer = {
+      once(_event, listener) {
+        errorHandler = listener;
+        return this;
+      },
+      listen(options, callback) {
+        calls.host = options.host;
+        calls.port = options.port;
+        listenCallback = callback;
+        return this;
+      },
+      close(callback) {
+        calls.closed = true;
+        callback();
+        return this;
+      },
+    };
+    return {
+      server,
+      calls,
+      emitError: (error) => errorHandler?.(error),
+      emitListen: () => listenCallback?.(),
+    };
+  }
+
+  function factoryOf(fake: ReturnType<typeof makeFakeServer>): V6ProbeServerFactory {
+    return () => fake.server;
+  }
+
+  it("binds the v6 wildcard and resolves true on a successful listen", async () => {
+    const fake = makeFakeServer();
+    const pending = probeV6WildcardSupport(0, factoryOf(fake));
+
+    fake.emitListen();
+    await expect(pending).resolves.toBe(true);
+    expect(fake.calls).toEqual({ host: V6_WILDCARD_HOST, port: 0, closed: true });
+  });
+
+  it("resolves false instead of rejecting when the wildcard bind errors", async () => {
+    const fake = makeFakeServer();
+    const pending = probeV6WildcardSupport(0, factoryOf(fake));
+
+    fake.emitError(new Error("EAFNOSUPPORT: no ipv6"));
+    await expect(pending).resolves.toBe(false);
+  });
+
+  it("aims the probe at the requested port", async () => {
+    const fake = makeFakeServer();
+    const pending = probeV6WildcardSupport(5899, factoryOf(fake));
+
+    fake.emitListen();
+    await expect(pending).resolves.toBe(true);
+    expect(fake.calls.port).toBe(5899);
+  });
+
+  it("passes through when resolving is attempted against an erroring server", async () => {
+    const fake = makeFakeServer();
+    const pending = probeV6WildcardSupport(0, factoryOf(fake));
+
+    fake.emitError(new Error("fail"));
+    await expect(pending).resolves.toBe(false);
+  });
+
+  it("smoke: the real probe agrees with a direct real bind on this host", async () => {
     const result = await probeV6WildcardSupport();
-    // This machine either supports v6 or it does not; the probe must agree
-    // with a direct bind attempt under the same conditions.
     const direct = await new Promise<boolean>((resolve) => {
       const probe = new NodeNet.Server();
       probe.once("error", () => resolve(false));
@@ -56,25 +129,5 @@ describe("probeV6WildcardSupport", () => {
       });
     });
     expect(result).toBe(direct);
-  });
-
-  it("resolves false instead of rejecting when the wildcard bind fails", async () => {
-    // Emulate bind failure by occupying a real wildcard port, then aiming the
-    // probe's failure path at it. The holder gets an error listener — an
-    // unhandled 'error' event kills the test process.
-    const holder = await new Promise<NodeNet.Server>((resolve, reject) => {
-      const server = new NodeNet.Server();
-      server.once("error", reject);
-      server.listen({ host: V6_WILDCARD_HOST, port: 0 }, () => {
-        server.removeAllListeners("error");
-        resolve(server);
-      });
-    });
-    const heldPort = (holder.address() as NodeNet.AddressInfo).port;
-
-    const occupiedProbe = await probeV6WildcardSupport(heldPort);
-    expect(occupiedProbe).toBe(false);
-
-    await new Promise<void>((resolve) => holder.close(() => resolve()));
   });
 });

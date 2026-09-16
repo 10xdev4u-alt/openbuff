@@ -14,10 +14,27 @@ import * as NodeNet from "node:net";
  *    operators may pass `0.0.0.0`, a tailnet IP, etc. — not our call).
  * 2. Otherwise probe `::` and use it when IPv6 is available (dual-stack).
  * 3. Fall back to `0.0.0.0` when IPv6 is unavailable (v4-only machines).
+ *
+ * Known tradeoff (reviewed 2026-09-16, CodeRabbit #49): a kernel with IPv6
+ * present but IPv4 absent — or hardened with `net.ipv6.bindv6only=1` — makes
+ * `::` v6-only for clients. We keep `::` there anyway: `0.0.0.0` cannot bind
+ * on a v4-less kernel, so a v4-connect side-probe (the suggested remedy) would
+ * steer exactly those machines into an unbindable fallback and kill the dev
+ * server. v6-only hosts stay served via `::`; the bindv6only=1 residue is
+ * recorded here rather than papered over with a third probe tier.
  */
 
 export const V6_WILDCARD_HOST = "::";
 export const V4_WILDCARD_HOST = "0.0.0.0";
+
+/** Minimal surface of a `node:net` server the probe needs — injectable so tests never depend on host IPv6. */
+export type BindableServer = {
+  once(event: "error", listener: (error: Error) => void): unknown;
+  listen(options: { host: string; port: number }, callback: () => void): unknown;
+  close(callback: () => void): unknown;
+};
+
+export type V6ProbeServerFactory = () => BindableServer;
 
 export function resolveDevBindHost(
   explicitHost: string | undefined,
@@ -30,9 +47,12 @@ export function resolveDevBindHost(
 }
 
 /** Probe whether the kernel accepts an IPv6 wildcard bind. */
-export function probeV6WildcardSupport(targetPort = 0): Promise<boolean> {
+export function probeV6WildcardSupport(
+  targetPort = 0,
+  makeServer: V6ProbeServerFactory = () => new NodeNet.Server(),
+): Promise<boolean> {
   return new Promise((resolve) => {
-    const probe = new NodeNet.Server();
+    const probe = makeServer();
     probe.once("error", () => resolve(false));
     probe.listen({ host: V6_WILDCARD_HOST, port: targetPort }, () => {
       probe.close(() => resolve(true));
