@@ -168,3 +168,4 @@ Model opportunities seen in `free-agents.ts:125-132`: `deepseek`, `mimo`, `minim
 | 2026-09-16 | Phase 0 bootstrap: repo map + graph v0 | all (initial) |
 | 2026-09-16 | Boot: fix dev-runner filters (`t3`→`openbuff`), install, launch, verify web+api, pair, preview | scripts/dev-runner, bin/cli, migrations, runtime ports, contracts/model.ts |
 | 2026-09-16 | Upstream dive: cloned CodebuffAI/freebuff to `.repos/freebuff`; protocol audit vs our FreebuffSession/Adapter (§5.5) | common/freebuff-models.ts, freebuff-session.ts, cli/freebuff-session-api.ts, sdk/run.ts+impl/llm.ts, free-agents.ts |
+| 2026-09-16 | Factory bootstrap + vendor-subject ban merged (PRs #35, #38); first work PR: dev-runner filter rename (#39) | AGENTS.md, agents/*, .github/workflows/*, scripts/dev-runner |
