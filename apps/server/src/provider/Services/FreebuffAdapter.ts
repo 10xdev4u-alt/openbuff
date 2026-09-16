@@ -64,6 +64,11 @@ import {
   type ProviderAdapterError,
 } from "../Errors.ts";
 import {
+  DEFAULT_FREEBUFF_FREE_MODEL,
+  FREEBUFF_FREE_AGENT_BY_MODEL,
+  resolveFreebuffAgentForModel,
+} from "@t3tools/contracts";
+import {
   classifyFreebuffGate,
   freebuffGateDisposition,
   gateUserMessage,
@@ -115,6 +120,13 @@ interface FreebuffSession {
    * turn (which re-admits); `superseded` is terminal for this adapter.
    */
   gateState: "ended" | "superseded" | undefined;
+  /**
+   * Latest `rateLimitsByModel` rows the server sent (admission or poll) —
+   * per-model pool status for the picker. Rows are opaque server-authored
+   * data: grouped by `pool` token, never matched on values (upstream
+   * `FreebuffSessionRateLimit` contract).
+   */
+  latestQuotaByModel: Record<string, unknown> | undefined;
 }
 
 /** SDK tool name → canonical item type (see TOOL_LIFECYCLE_ITEM_TYPES). */
@@ -160,20 +172,23 @@ const nowIso = (): string => Effect.runSync(Effect.map(DateTime.now, DateTime.fo
  * without touching the network. This mirrors what the real Freebuff CLI does:
  * it ships these templates locally rather than fetching them.
  *
- * The model is the one this account is entitled to (geo-limited free tier).
+ * The model follows the turn's selection, paired with its base3 agent id via
+ * `resolveFreebuffAgentForModel` (@t3tools/contracts) — a model may only be
+ * requested through its allowlisted pairing or the backend 403s with
+ * free_mode_invalid_agent_model.
  * The system prompt is self-contained: the SDK does NOT substitute the
  * `{CODEBUFF_*}` placeholders the upstream base3 harness uses, so they are
  * inlined or dropped here.
  */
-const FREEBUFF_BASE_FREE_AGENT: AgentDefinition = {
-  // The id MUST be one the Freebuff backend's free-mode allowlist recognizes
-  // (FREE_MODE_AGENT_MODELS in common/src/constants/free-agents.ts). A
-  // non-whitelisted id 403s with free_mode_invalid_agent_model. This is the
-  // root pinned to deepseek/deepseek-v4-flash — the model this account is
-  // entitled to on the geo-limited free tier.
-  id: "base3-free-deepseek-flash",
-  displayName: "Buffy on DeepSeek Flash",
-  model: "deepseek/deepseek-v4-flash",
+function makeFreebuffBaseAgent(model: string | undefined): AgentDefinition {
+  const resolvedModel =
+    model !== undefined && model in FREEBUFF_FREE_AGENT_BY_MODEL
+      ? model
+      : DEFAULT_FREEBUFF_FREE_MODEL;
+  return {
+  id: resolveFreebuffAgentForModel(model),
+  displayName: "Buffy",
+  model: resolvedModel,
   providerOptions: { data_collection: "deny" },
   outputMode: "last_message",
   includeMessageHistory: true,
@@ -203,9 +218,10 @@ const FREEBUFF_BASE_FREE_AGENT: AgentDefinition = {
 - Your responses are displayed in a terminal. Keep them short and concise.
 - Don't run destructive or hard-to-undo commands (git push, resets, deploys) unless the user asks for them.
 
-You are running on the deepseek/deepseek-v4-flash model. You are the AI agent behind Freebuff, a tool where users can chat with you to code with AI for free. See freebuff.com for more information about the product.
+You are running on the ${resolvedModel} model. You are the AI agent behind Freebuff, a tool where users can chat with you to code with AI for free. See freebuff.com for more information about the product.
 `,
-};
+  };
+}
 
 /** Typed wrapper for a rejected SDK run (see Effect.tryPromise below). */
 class FreebuffRunFailure extends Data.TaggedError("FreebuffRunFailure")<{
@@ -280,6 +296,7 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
           autoApproveCommands: false,
           freebuffInstanceId: undefined,
           gateState: undefined,
+          latestQuotaByModel: undefined,
         });
         return session;
       });
@@ -373,6 +390,9 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
               }),
           }).pipe(Effect.orElseSucceed(() => null));
           if (poll !== null) {
+            if (poll.rateLimitsByModel !== undefined) {
+              state.latestQuotaByModel = poll.rateLimitsByModel;
+            }
             const cls = classifySessionPoll(poll);
             switch (cls.kind) {
               case "gone":
@@ -434,7 +454,11 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
         // subsequent turn; re-admit if a previous admission was never made.
         if (state.freebuffInstanceId === undefined) {
           const admission = yield* Effect.tryPromise({
-            try: () => establishFreebuffSession(config.apiKey, { signal: abort.signal }),
+            try: () =>
+              establishFreebuffSession(config.apiKey, {
+                signal: abort.signal,
+                ...(modelSelection !== undefined ? { model: modelSelection } : {}),
+              }),
             catch: (cause) =>
               new ProviderAdapterRequestError({
                 provider: "freebuff",
@@ -457,6 +481,7 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
             );
           }
           state.freebuffInstanceId = admission.instanceId;
+          state.latestQuotaByModel = admission.rateLimitsByModel;
         }
 
         const client = new CodebuffClient({
@@ -541,7 +566,7 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
                 // resolves them in-process. A string id instead falls through
                 // to a database fetch of a published agent — and the free-mode
                 // roots are not published (404), which hangs the run silently.
-                agent: FREEBUFF_BASE_FREE_AGENT,
+                agent: makeFreebuffBaseAgent(modelSelection),
                 costMode: "free",
                 prompt,
                 ...(previousRun !== undefined ? { previousRun } : {}),

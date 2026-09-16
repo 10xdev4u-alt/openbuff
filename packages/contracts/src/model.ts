@@ -166,6 +166,50 @@ export const DEFAULT_MODEL_BY_PROVIDER: Partial<Record<ProviderDriverKind, strin
   [FREEBUFF_DRIVER_KIND]: DEFAULT_FREEBUFF_FREE_MODEL,
 };
 
+/**
+ * The free-mode agent pairing table — one base3 root agent id per selectable
+ * free-tier model, mirrored verbatim from upstream
+ * (`common/src/constants/free-agents.ts` `FREEBUFF_WEB_BASE3_AGENT_ID_BY_MODEL`,
+ * 8 core picker rows as of 2026-09-16). The backend's free-mode allowlist
+ * rejects any model whose paired agent id is not sent with the request
+ * (`free_mode_invalid_agent_model`), so a model may only be requested through
+ * its row here. Models outside the map resolve to the flash fallback root,
+ * which itself rejects unknown models server-side — fail-closed.
+ *
+ * Paired with `FREEBUFF_FREE_MODEL_IDS` (picker enumeration) and
+ * `resolveFreebuffAgentForModel` (request derivation).
+ */
+export const FREEBUFF_FREE_AGENT_BY_MODEL: Readonly<Record<string, string>> = {
+  "deepseek/deepseek-v4-pro": "base3-free-deepseek",
+  "deepseek/deepseek-v4-flash": "base3-free-deepseek-flash",
+  "mimo/mimo-v2.5": "base3-free-mimo",
+  "minimax/minimax-m3": "base3-free-minimax-m3",
+  "openai/gpt-5.6-luna": "base3-free-luna",
+  "z-ai/glm-5.2": "base3-free-glm",
+  "z-ai/glm-5.3-flash": "base3-free-glm-5-3-flash",
+  "crof/kimi-k3-eco": "base3-free-kimi-k3-eco",
+};
+
+/** Every selectable free-tier model id (the picker's row set). */
+export const FREEBUFF_FREE_MODEL_IDS: ReadonlyArray<string> = Object.keys(
+  FREEBUFF_FREE_AGENT_BY_MODEL,
+);
+
+/**
+ * The base3 agent id to admit a session with for the requested model.
+ * Unknown or absent models fall back to the flash root (the tier's default),
+ * mirroring upstream's "resolve to the fallback model's root" rule.
+ */
+export function resolveFreebuffAgentForModel(model: string | undefined): string {
+  if (model !== undefined) {
+    const agentId = FREEBUFF_FREE_AGENT_BY_MODEL[model];
+    if (agentId !== undefined) {
+      return agentId;
+    }
+  }
+  return FREEBUFF_FREE_AGENT_BY_MODEL[DEFAULT_FREEBUFF_FREE_MODEL] as string;
+}
+
 /** Per-provider text generation model defaults. */
 export const DEFAULT_TEXT_GENERATION_MODEL_BY_PROVIDER: Partial<
   Record<ProviderDriverKind, string>
