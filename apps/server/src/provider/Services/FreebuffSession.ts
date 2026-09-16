@@ -1,3 +1,8 @@
+// @effect-diagnostics globalDate:off
+// Plain (non-Effect) module: retry-after HTTP-date parsing needs a wall-clock
+// "now" for a one-shot header decode. Threading Effect Clock through it for a
+// single Date.now() is disproportionate; this matches the sanctioned opt-out
+// used by serviceLauncher.ts and usageAggregation.ts.
 /**
  * FreebuffSession — free-tier session admission + request tie-in.
  *
@@ -94,8 +99,8 @@ export type FreebuffSessionErrorCode =
 /** Typed failure from a hard session-API error (status + code + retry hint). */
 export class FreebuffSessionRequestError extends Error {
   readonly status: number;
-  readonly errorCode?: string;
-  readonly retryAfterMs?: number;
+  readonly errorCode?: string | undefined;
+  readonly retryAfterMs?: number | undefined;
 
   constructor(
     message: string,
