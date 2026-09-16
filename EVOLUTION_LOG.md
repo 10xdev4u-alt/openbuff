@@ -73,3 +73,9 @@ Read root manifests + README + AGENTS.md, listed `apps/`, `packages/`, `apps/ser
 4. Never merge in a command batch that also produces the review verdict — read reviews, then merge, as separate steps.
 
 **Graph nodes updated:** §1/§2/mermaid POST refs → admission route (PR #44); task log row appended.
+
+### 2026-09-16 — #28 free model default (PR #47, MERGED ffc59855)
+What I tried: contracts free-pin constant + map entry; settings-aware bootstrap selection (first enabled driver, per-driver default, codex fallback); live-settings boot seeding; Layer.merge for chained provides.
+What worked/failed: TDD held (RED 3→GREEN); evidence flipped the issue's own acceptance reading — `DEFAULT_MODEL` must STAY `gpt-5.6-sol` because it IS codex's map value; repointing it would hand codex users a model their plan may not include. FAILED locally-green/CI-red AGAIN (pipeline-exit mistake, third variant: counted `error TS` lines instead of asserting tsgo exit code; repo's tsgo fails on warnings).
+Lesson as reusable rule: pipeline-exit counter is now 3 → per charter the workflow changes: checker gates run BARE (no pipe) with `echo EXIT:$?` immediately after; grep filters only for display. Also: tsgo here treats warnings as errors — never ship new `multipleEffectProvide`/suggestion diagnostics.
+Graph nodes updated: task log row appended (§6).
