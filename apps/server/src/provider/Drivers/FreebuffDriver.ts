@@ -19,6 +19,7 @@ import {
   FREEBUFF_FREE_MODEL_IDS,
   FreebuffSettings,
   ProviderDriverKind,
+  type FreebuffProviderUsage,
   type ServerProvider,
   type ServerProviderModel,
 } from "@t3tools/contracts";
@@ -39,6 +40,7 @@ import {
   type ProviderInstance,
 } from "../ProviderDriver.ts";
 import { buildServerProvider } from "../providerSnapshot.ts";
+import { mergeProviderUsage } from "../providerUsageMerge.ts";
 import { makeManualOnlyProviderMaintenanceCapabilities } from "../providerMaintenance.ts";
 
 /**
@@ -225,6 +227,11 @@ export const FreebuffDriver: ProviderDriver<FreebuffSettings, FreebuffDriverEnv>
         },
       });
 
+      // Session responses update this box (adapter capture, issue #31); the
+      // snapshot closure reads it so web sees the freshest meter. Initialized
+      // from the draft so a re-created driver keeps the last known usage.
+      const usageRef: { current: FreebuffProviderUsage | undefined } = { current: undefined };
+
       let current: ServerProvider = {
         ...snapshotDraft,
         instanceId: input.instanceId,
@@ -239,7 +246,9 @@ export const FreebuffDriver: ProviderDriver<FreebuffSettings, FreebuffDriverEnv>
         getSnapshot: Effect.succeed(current),
         refresh: Effect.flatMap(resolveAuthNow(input.config.apiKey), (nextAuth) =>
           Effect.sync(() => {
+            const usage = mergeProviderUsage(current.usage, usageRef.current);
             current = {
+              ...(usage !== undefined ? { usage } : {}),
               ...current,
               auth: {
                 status: nextAuth.token.length > 0 ? ("authenticated" as const) : ("unauthenticated" as const),
@@ -274,6 +283,7 @@ export const FreebuffDriver: ProviderDriver<FreebuffSettings, FreebuffDriverEnv>
       const adapter = yield* makeFreebuffAdapter({
         config: { ...input.config, apiKey: auth.token },
         instanceId: String(input.instanceId),
+        usageRef,
       });
 
       return {

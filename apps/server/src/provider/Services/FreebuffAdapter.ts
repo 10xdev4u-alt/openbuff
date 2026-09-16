@@ -73,6 +73,11 @@ import {
   freebuffGateDisposition,
   gateUserMessage,
 } from "./FreebuffGate.ts";
+import {
+  mergeProviderUsage,
+  usageFromSessionResponse,
+} from "../providerUsageMerge.ts";
+import type { FreebuffProviderUsage } from "@t3tools/contracts";
 import type {
   ProviderAdapterShape,
   ProviderThreadSnapshot,
@@ -91,6 +96,13 @@ export const FREEBUFF_DRIVER_KIND = ProviderDriverKind.make("freebuff");
 export interface MakeFreebuffAdapterOptions {
   readonly config: FreebuffSettings;
   readonly instanceId: string;
+  /**
+   * Mutable box the adapter writes each session response's usage meter into
+   * (issue #31). The driver's snapshot closure reads it on getSnapshot/refresh
+   * so the web cockpit sees the freshest capture without a new RPC. Optional:
+   * absent (tests, non-snapshot embeddings) simply skips the capture.
+   */
+  readonly usageRef?: { current: FreebuffProviderUsage | undefined };
 }
 
 /** A command approval parked while the web UI decides (see #4). */
@@ -234,7 +246,7 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
   Scope.Scope | Crypto.Crypto
 > =>
   Effect.gen(function* () {
-    const { config, instanceId } = options;
+    const { config, instanceId, usageRef } = options;
     const crypto = yield* Crypto.Crypto;
     const newUuid = (): string => Effect.runSync(crypto.randomUUIDv4);
     const runtimeEvents = yield* Queue.unbounded<ProviderRuntimeEvent>();
@@ -390,6 +402,9 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
               }),
           }).pipe(Effect.orElseSucceed(() => null));
           if (poll !== null) {
+            if (usageRef !== undefined) {
+              usageRef.current = mergeProviderUsage(usageRef.current, usageFromSessionResponse(poll));
+            }
             if (poll.rateLimitsByModel !== undefined) {
               state.latestQuotaByModel = poll.rateLimitsByModel;
             }
@@ -482,6 +497,12 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
           }
           state.freebuffInstanceId = admission.instanceId;
           state.latestQuotaByModel = admission.rateLimitsByModel;
+          if (usageRef !== undefined) {
+            usageRef.current = mergeProviderUsage(
+              usageRef.current,
+              usageFromSessionResponse(admission),
+            );
+          }
         }
 
         const client = new CodebuffClient({

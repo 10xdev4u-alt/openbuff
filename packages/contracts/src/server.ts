@@ -158,6 +158,83 @@ export const ServerProviderUpdateState = Schema.Struct({
 });
 export type ServerProviderUpdateState = typeof ServerProviderUpdateState.Type;
 
+/**
+ * One per-model quota row (upstream `FreebuffSessionRateLimit`). `pool` is an
+ * OPAQUE token — group rows by it, never match on values; `poolLabel` is the
+ * server-authored display string. Unknown periods render as their reset
+ * instant says, never by guessing the period name.
+ */
+export const FreebuffProviderQuotaRow = Schema.Struct({
+  pool: Schema.optional(Schema.String),
+  poolLabel: Schema.optional(Schema.String),
+  period: Schema.optional(Schema.String),
+  resetTimeZone: Schema.optional(Schema.String),
+  resetAt: Schema.String,
+  limit: Schema.Number,
+  recentCount: Schema.Number,
+  entitlementBreakdown: Schema.optional(
+    Schema.Struct({
+      base: Schema.optional(Schema.Number),
+      referral: Schema.optional(Schema.Number),
+      streak: Schema.optional(Schema.Number),
+      promo: Schema.optional(Schema.Number),
+    }),
+  ),
+});
+
+/** Session-window counters (upstream `FreebuffFreeWindowsInfo`). Week/month are
+ * display-only per upstream docs; `day` is the enforced window. */
+export const FreebuffProviderFreeWindows = Schema.Struct({
+  dayUsed: Schema.Number,
+  dayLimit: Schema.Number,
+  weekUsed: Schema.Number,
+  weekLimit: Schema.Number,
+  monthUsed: Schema.Number,
+  monthLimit: Schema.Number,
+  dayResetAt: Schema.String,
+  monthResetAt: Schema.String,
+});
+
+/** Freebucks meter (upstream `FreebuffFreebucksInfo`). `balance` is
+ * `daily.remaining + wallet.balance` server-side; prices are per metered model. */
+export const FreebuffProviderFreebucks = Schema.Struct({
+  quotaExempt: Schema.optional(Schema.Boolean),
+  balance: Schema.Number,
+  daily: Schema.Struct({
+    limit: Schema.Number,
+    spent: Schema.Number,
+    remaining: Schema.Number,
+    resetAt: Schema.String,
+    resetTimeZone: Schema.optional(Schema.String),
+  }),
+  wallet: Schema.Struct({
+    balance: Schema.Number,
+    monthlyBonus: Schema.Number,
+    nextBonusAt: Schema.optional(Schema.String),
+  }),
+  planId: Schema.NullOr(Schema.String),
+  prices: Schema.Record(Schema.String, Schema.Number),
+});
+
+/**
+ * The freebuff usage block carried on a provider snapshot. `freebucks` stays
+ * nullable: null means the meter block exists but could not refresh this
+ * cycle, and the UI must clear its stale balance instead of showing it.
+ */
+export const FreebuffProviderUsage = Schema.Struct({
+  rateLimitsByModel: Schema.optional(
+    Schema.Record(Schema.String, FreebuffProviderQuotaRow),
+  ),
+  freeWindows: Schema.optional(FreebuffProviderFreeWindows),
+  // NullOr, not plain: `null` on the wire means "meter exists, refresh failed"
+  // and must reach the UI as null so stale balances get cleared.
+  freebucks: Schema.optional(Schema.NullOr(FreebuffProviderFreebucks)),
+});
+export type FreebuffProviderQuotaRow = typeof FreebuffProviderQuotaRow.Type;
+export type FreebuffProviderFreeWindows = typeof FreebuffProviderFreeWindows.Type;
+export type FreebuffProviderFreebucks = typeof FreebuffProviderFreebucks.Type;
+export type FreebuffProviderUsage = typeof FreebuffProviderUsage.Type;
+
 export const ServerProvider = Schema.Struct({
   // Routing key for the configured instance this snapshot represents. This
   // is the only stable identity consumers may use for provider routing.
@@ -194,6 +271,14 @@ export const ServerProvider = Schema.Struct({
   skills: Schema.Array(ServerProviderSkill).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   versionAdvisory: Schema.optionalKey(ServerProviderVersionAdvisory),
   updateState: Schema.optionalKey(ServerProviderUpdateState),
+  /**
+   * Freebuff free-tier usage meter, captured from the live session response
+   * and merged onto the snapshot by the driver (freshest capture wins).
+   * Absent for every other driver and for servers predating the meter.
+   * `freebucks: null` is distinct from absent: the block exists but could not
+   * refresh, so consumers must CLEAR stale balances rather than keep them.
+   */
+  usage: Schema.optionalKey(FreebuffProviderUsage),
 });
 export type ServerProvider = typeof ServerProvider.Type;
 
