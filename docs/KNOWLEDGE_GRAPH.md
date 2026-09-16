@@ -1,0 +1,170 @@
+# KNOWLEDGE_GRAPH.md — OpenBuff
+
+> Maintained by APEX-0. Updated after EVERY task. `file:line` claims are backed by direct reads.
+> Confidence legend: **V** = verified by read/execution, **H** = heuristic/inferred, **U** = unverified.
+
+## 0. Repo identity (observed)
+
+| Field | Value | Evidence |
+|---|---|---|
+| Name | `openbuff-monorepo` | `package.json:2` |
+| What | Open-source local web UI for the Freebuff agent; fork of pingdotgg/t3code (MIT) | `README.md:1-17` |
+| Distribution | `npx openbuff@latest`; bin `openbuff` → `apps/server/dist/bin.mjs` | `README.md:13`, `apps/server/package.json:8-10` |
+| Engine | `@codebuff/sdk` 0.10.x runs the agent loop in-process (no provider CLIs) | `apps/server/package.json:19`, `apps/server/src/provider/Drivers/FreebuffDriver.ts:1-10` |
+| Stack | pnpm 11.10 monorepo, Node >=24.13.1, Effect 4.0.0-beta.103, TypeScript ~6.0.3 (tsgo), vite-plus, React 19.2.6, Tailwind v4, SQLite (`@effect/sql-sqlite-bun`) | `package.json:46-52`, `pnpm-workspace.yaml:1-10,42-66`, `apps/web/package.json:31-56`, `apps/server/package.json:21` |
+| Status | Very early fork; last commits all Freebuff-driver fixes (M3 Expressive design just landed) | `git log`: `15f3bc76`, `c0953ccf` |
+
+## 1. Entities
+
+### 1.1 Workspaces (pnpm)
+`apps/server`, `apps/web`, `packages/contracts`, `packages/shared`, `packages/client-runtime`, `packages/ssh`, `packages/tailscale`, `oxlint-plugin-t3code`, `scripts`, `infra/*` — `pnpm-workspace.yaml:1-7`.
+
+### 1.2 Services (server: `apps/server/src`)
+
+| Entity | Role | Evidence |
+|---|---|---|
+| `bin.ts` → CLI (`effect/unstable/cli`) | `openbuff` root cmd; subs: start/serve/pair/auth/project/service/servicePreflight/connect(hidden w/o config) | `bin.ts:10-18,45-60` |
+| `ws.ts` | WebSocket RPC surface; imports `ORCHESTRATION_WS_METHODS`, orchestration/git/project/relay errors (2361 lines) | `ws.ts:1-45` |
+| `server.ts` | HTTP+WS server assembly | exists, not yet read (U) |
+| `bootstrap.ts` | Launch handshake over stdio FDs (desktop service launcher path) | `bootstrap.ts:1-60` |
+| Orchestration | `OrchestrationEngineService`: `readEvents`, `dispatch`, `streamDomainEvents`, `latestSequence`; pure `decider.ts` + `projector.ts`; per-aggregate command invariants | `orchestration/Services/OrchestrationEngine.ts:21-77`, `orchestration/decider.ts`, `orchestration/commandInvariants.ts` |
+| Provider runtime | `ProviderService`, adapter SPI `ProviderAdapterShape`, session registries | `provider/Services/*` |
+| Persistence | SQLite event store + projection services; 40 sequential migrations | `persistence/Services/*`, `persistence/Migrations.ts:22-67` |
+| Checkpointing | `CheckpointStore`, `CheckpointDiffQuery`, `Diffs` (git-hidden-refs model per glossary) | `checkpointing/*`, `docs/internals/glossary.md:120+` |
+| CLI auth | `cli/auth.ts` (login/credential reuse) | `bin.ts:15` |
+
+### 1.3 Provider layer (the fork's core)
+
+| Entity | Role | Evidence |
+|---|---|---|
+| `FreebuffDriver` | Only driver under `provider/Drivers/`. `create` materializes adapter closure + snapshot; no subprocess. Auth resolution: settings override → `CODEBUFF_API_KEY` env → `~/.config/manicode/credentials.json` (`default.authToken`) | dir listing `provider/Drivers/`, `FreebuffDriver.ts:24,62-117` |
+| `makeHeuristicTextGeneration` | Local stubs for commit-msg/PR/branch/thread-title (no model call) | `FreebuffDriver.ts:120-152` |
+| `FreebuffAdapter` | Transliterates SDK callbacks → canonical `ProviderRuntimeEvent` (delta/tool_call/tool_result/completed/aborted/failed); stores `RunState` per thread for resume; `readThread` reconstructs from turns; `rollbackThread` = no-op v1; `pendingApprovals` map + `autoApproveCommands` for command approvals | `FreebuffAdapter.ts:1-22,86-115,117+` |
+| `FreebuffSession` | Free-tier admission: POST `https://www.codebuff.com/api/v1/freebuff/session` → `instanceId`; `installFreebuffFetchInterceptor` wraps `globalThis.fetch` to inject `codebuff_metadata.freebuff_instance_id` via `AsyncLocalStorage`; pinned model `deepseek/deepseek-v4-flash` | `FreebuffSession.ts:8-35,44,52,59-71` |
+| Free-mode gates (3) | (1) canonical system-prompt marker, (2) allowlisted agent+model, (3) active session instance id — else `waiting_room_required` | `FreebuffSession.ts:8-19` |
+
+### 1.4 DB tables (SQLite, migrations 001–040)
+
+Core: `orchestration_events` (m1), `orchestration_command_receipts` (m2), checkpoint diff blobs (m3), `provider_session_runtime` (m4) + mode/instance-id columns (m9, m27), projections (m5): `projection_projects`, `projection_threads` (+ runtime_mode m10, interaction_mode m12, archived_at m17/18, settled m33, snoozed m34, pinned m36/38), `projection_thread_messages` (+ attachments m7), `projection_thread_activities` (seq m8), `projection_turns` (+ source_proposed_plan m15, keyset index m37), `projection_thread_proposed_plans` (m13/14), `projection_pending_approvals` (m25 cleanup), `projection_checkpoints`, auth tables (m20/21/22/31/32), shell summary (m23/24/30), favicon (m40). Evidence: `persistence/Migrations.ts:22-67` + migration filenames.
+
+### 1.5 External deps (runtime)
+
+| Dep | Used by | Why |
+|---|---|---|
+| `@codebuff/sdk` | server | agent engine (in-process) |
+| `effect` + `@effect/platform-*`, `@effect/sql-sqlite-bun` | server | runtime, DI, SQL |
+| `node-pty` | server | terminals |
+| `@pierre/diffs` | server, web | diff rendering |
+| `@clerk/react` | web | hosted auth (upstream remnant) |
+| TanStack Router, Zustand, Lexical, dnd-kit, Tailwind v4 | web | UI |
+| `vite-plus` (voidzero) | all | dev/build/test harness (`vp` CLI) |
+
+### 1.6 Key functions
+`resolveAuth` (`FreebuffDriver.ts:66`), `establishFreebuffSession` (`FreebuffSession.ts:87`), `installFreebuffFetchInterceptor` (`FreebuffSession.ts`, exported), `makeFreebuffAdapter` (`FreebuffAdapter.ts:70`), `mapToolNameToItemType` (`FreebuffAdapter.ts:117`), `OrchestrationEngine.dispatch` (`Services/OrchestrationEngine.ts:57`), `makeCli` (`bin.ts:42`).
+
+## 2. Relations
+
+| From | Relation | To | Evidence |
+|---|---|---|---|
+| web (browser) | WS_CALLS | `ws.ts` RPC methods | `ws.ts:17-45` (`ORCHESTRATION_WS_METHODS`) |
+| `bin.ts` | OWNS | CLI subcommands → `cli/server.ts` `runServerCommand` | `bin.ts:45-60` |
+| `runServerCommand` | DEPENDS_ON | server layers (http, ws, persistence, orchestration, provider) | H (server.ts unread) |
+| `ws.ts` | CALLS | `OrchestrationEngineService.dispatch` / read model | `OrchestrationEngine.ts:21-77` contract |
+| OrchestrationEngine | PERSISTS | `OrchestrationEventStore` → SQLite | `OrchestrationEngine.ts:8-11`, `persistence/Services/OrchestrationEventStore.ts` |
+| events | PROJECTED_BY | `projector.ts` → projection_* tables | glossary + `persistence/Services/Projection*.ts` |
+| decider | EMITS | domain events (`thread.created`, …) | glossary.md:64-77 |
+| ProviderService | OWNS | sessions; adapters via `ProviderAdapterRegistry` | `provider/Services/*` |
+| `FreebuffAdapter` | CALLS | `@codebuff/sdk` `CodebuffClient.run` (1 run/turn) | `FreebuffAdapter.ts:3-6` |
+| `FreebuffAdapter` | USES | `FreebuffSession.establish/interceptor` | `FreebuffAdapter.ts:73-75` |
+| `FreebuffDriver` | BUILDS | `makeFreebuffAdapter` + `buildServerProvider` snapshot | `FreebuffDriver.ts:30-33` |
+| `FreebuffSession` | HTTP_POST | codebuff.com `/api/v1/freebuff/session` | `FreebuffSession.ts:31-35,87` |
+| SDK chat calls | CARRY | `codebuff_metadata.freebuff_instance_id` | `FreebuffSession.ts:24-29` |
+| CheckpointReactor | WRITES | git hidden refs + `checkpoint diff blobs` | glossary.md:120+, m3 |
+| web | DEPENDS_ON | `@t3tools/contracts`, `client-runtime` | `apps/web/package.json:38-41` |
+
+## 3. Graph
+
+```mermaid
+flowchart LR
+  subgraph Client
+    WEB["apps/web React19/Vite"]
+    CLIUI["pairing/auth browser flows"]
+  end
+
+  subgraph Server["apps/server (Effect)"]
+    BIN["bin.ts CLI"] --> SRV["server.ts / http.ts"]
+    SRV --> WS["ws.ts RPC"]
+    WS --> ENG["OrchestrationEngine"]
+    ENG --> DEC["decider.ts pure"]
+    ENG --> PRJ["projector.ts"]
+    ENG --> STORE["OrchestrationEventStore"]
+    PRJ --> SQL[("SQLite projection_*")]
+    STORE --> SQL2[("orchestration_events")]
+    ENG --> RT["ProviderRuntimeIngestion"]
+    RT --> PS["ProviderService"]
+    PS --> REG["ProviderAdapterRegistry"]
+    REG --> AD["FreebuffAdapter"]
+    AD --> SDK["@codebuff/sdk in-process"]
+    AD --> FS["FreebuffSession admission+fetch interceptor"]
+    ENG --> CK["CheckpointReactor/Store"]
+    CK --> GIT[("git hidden refs + diff blobs")]
+  end
+
+  subgraph Machine["execution boundary: user machine"]
+    GIT
+    SQL
+    SQL2
+    PTY["node-pty terminals"]
+    CRED[("~/.config/manicode/credentials.json")]
+  end
+
+  SDK --> CB["codebuff.com backend (free tier)"]
+  FS -->|POST /api/v1/freebuff/session| CB
+  CRED -->|authToken| DRV["FreebuffDriver.resolveAuth"]
+  DRV --> AD
+  WEB -->|typed WS| WS
+  PTY --> WS
+```
+
+## 4. Known stale/conflicting docs (verified conflicts)
+
+| Source says | Code shows | Verdict |
+|---|---|---|
+| `AGENTS.md:5` "Node WebSocket server wraps provider CLIs (Codex, Claude, Cursor, Grok, OpenCode)" | Only `FreebuffDriver.ts` exists in `provider/Drivers/`; SDK in-process | Docs stale (upstream) |
+| glossary.md "Five drivers ship built in" | one driver | Docs stale |
+| `FreebuffAdapter.ts:16-19` "approvals … cannot yet reach a running SDK turn … arrive with the overrideTools interception in issue #4" | interface already has `pendingApprovals`, `autoApproveCommands` (#18 "terminal command approval flow" shipped per git log) | Header partially stale — verify behavior before trusting either |
+
+## 5.5 Upstream reference: `.repos/freebuff` (CodebuffAI/freebuff, cloned 2026-09-16, read-only)
+
+The vendor's own monorepo — `common/` (wire contracts), `cli/` (reference client), `sdk/` (engine we embed, same `0.10.7` as installed). Treat as protocol truth over our assumptions.
+
+| Topic | Upstream truth | Evidence | Our fork | Delta verdict |
+|---|---|---|---|---|
+| Admission POST path | `/api/v1/freebuff/session/admission` (dedicated route; "fail closed on servers predating these guarantees") | `common/src/constants/freebuff-models.ts:2510-2512` | POSTs `/api/v1/freebuff/session` (the GET path) | DIVERGENT — legacy path; fragile (works today per commit log, H) |
+| POST headers | `Authorization` + tz headers + `x-freebuff-first-tab-discount` + `x-freebuff-model` + `x-freebuff-wallet-spend-limit`; **no instance header on POST** | `cli/src/utils/freebuff-session-api.ts:80-105` | sends `x-freebuff-instance-id` hint + `{}` body; omits wallet-limit + first-tab headers | DIVERGENT (hint header is GET/DELETE-only upstream) |
+| Instance id injection | SDK `RunParams.extraCodebuffMetadata` merges caller keys into `codebuff_metadata` (caller keys first, reserved ids protected) | `sdk/src/run.ts:240-243`, `sdk/src/impl/llm.ts:109-127` | `globalThis.fetch` interceptor + AsyncLocalStorage | Interceptor is a workaround: hook **absent from installed 0.10.7 dist** (0 occurrences verified); present in repo HEAD, unreleased (npm latest = 0.10.7). Delete interceptor on 0.10.8. |
+| Gate codes | `FREEBUFF_GATE_CODES`: rejection = (`error` code, HTTP status) **pair**; `waiting_room_required` 428, `session_expired` 410, `session_superseded` 409, `session_model_mismatch` 409 (all `endsTheSession`); `session_limit_reached` 409, `waiting_room_queued` 429, `model_unavailable` 410 (session survives) | `common/src/types/freebuff-session.ts` (`FREEBUFF_GATE_CODES`, `getFreebuffGateCode`) | only string-matches `waiting_room_required` | GAP — mid-turn `session_expired`/`superseded`/`model_unavailable` kill our turns opaquely; no re-admit loop |
+| Session lifecycle | CLI polls GET `/session` (`x-freebuff-compact-session` beats); `ended`+`instanceId` = grace window, chat still flows; statuses: `model_locked`, `rate_limited`, `ip_capped`, `spend_limited`, `country_blocked`, `banned`, `model_unavailable`(`availableAt`/`withdrawn`) | `freebuff-session-api.ts:140-205`, `freebuff-session.ts` | no poll loop at all; non-OK → generic throw | GAP — no expiry awareness, raw errors reach users |
+| Model/agent pin | `deepseek/deepseek-v4-flash` → agent `base3-free-deepseek-flash` is a real allowlisted pairing | `common/src/constants/free-agents.ts:126` | same pin | MATCH ✓ |
+| Prompt gate | `hasFreebuffRootSystemPromptOpening`: canonical marker prefix accepted, pre-2026-07-07 base2 opening accepted, Freebuff2API "System Override" injection explicitly rejected | `common/src/__tests__/free-agents.test.ts:315-334,615-640` | opens agent def with canonical marker | MATCH ✓ (they also actively fight `Freebuff2API`-style proxies — noted) |
+| API base | `env.NEXT_PUBLIC_CODEBUFF_APP_URL \|\| 'https://codebuff.com'` | `freebuff-session-api.ts:78-80` | `https://www.codebuff.com` | Minor (www vs apex) |
+
+Model opportunities seen in `free-agents.ts:125-132`: `deepseek`, `mimo`, `minimax-m3`, `luna` (gpt-5.6), `glm`, `glm-5.3-flash`, `kimi-k3-eco` — a real model picker is possible against `SUPPORTED_FREEBUFF_MODELS`.
+
+## 5. Runtime evidence (2026-09-16 boot)
+
+- `pnpm install` green (2m14s); node-pty native build OK; effect-tsgo patch verified (`scripts/clean-tsgo-backups.mjs` + patch in root `prepare`).
+- **Bug fixed:** `scripts/dev-runner.ts:79,83` filtered `--filter=t3` — package renamed to `openbuff` in commit `5a64e69f` but runner missed. `pnpm dev` would start contracts+web and never the server. Pinned test updated: `scripts/dev-runner.test.ts:95`. Confidence 100% (no `"name": "t3"` anywhere).
+- Boot chain observed: migrations 1–40 applied → `Listening on http://127.0.0.1:13773` → reaper started → pairing URL minted (`/pair#token=...`).
+- Web binds IPv6 loopback only: `[::1]:5733` — probe with `localhost`/`[::1]`, not `127.0.0.1` (`ss` evidence).
+- Pair page consumed token; preview landed on `/draft/<uuid>` with project `custom-learned-skills-dir`.
+- Benign log noise: `TelemetryIdentityDecodeError` from stale `~/.codex/auth.json` (upstream telemetry identity path survives in server).
+- UI flag: composer showed `gpt-5.6-sol` — upstream default at `packages/contracts/src/model.ts:136` (`DEFAULT_MODEL`), map still Codex-keyed at :150-151. Cosmetic for free-tier (server strips paid overrides, commit `9f6da131`) but a UI lie; fix candidate.
+
+## 6. Task log (append every task)
+
+| Date | Task | Graph nodes touched |
+|---|---|---|
+| 2026-09-16 | Phase 0 bootstrap: repo map + graph v0 | all (initial) |
+| 2026-09-16 | Boot: fix dev-runner filters (`t3`→`openbuff`), install, launch, verify web+api, pair, preview | scripts/dev-runner, bin/cli, migrations, runtime ports, contracts/model.ts |
+| 2026-09-16 | Upstream dive: cloned CodebuffAI/freebuff to `.repos/freebuff`; protocol audit vs our FreebuffSession/Adapter (§5.5) | common/freebuff-models.ts, freebuff-session.ts, cli/freebuff-session-api.ts, sdk/run.ts+impl/llm.ts, free-agents.ts |

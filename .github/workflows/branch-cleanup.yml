@@ -1,0 +1,50 @@
+name: Branch cleanup
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  delete-merged:
+    name: Delete merged branches
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Delete merged head branch
+        run: |
+          branch="${{ github.event.pull_request.head.ref }}"
+          repo="${{ github.event.pull_request.head.repo.full_name }}"
+          if [ "$repo" = "${{ github.repository }}" ]; then
+            gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/$branch" \
+              -H "Authorization: Bearer ${{ github.token }}" && echo "deleted $branch"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  sweep-stale:
+    name: Flag stale branches
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: List branches older than 14 days without commits
+        run: |
+          gh api "repos/${{ github.repository }}/branches" --paginate \
+            --jq '.[].name' | while read -r b; do
+            [ "$b" = "main" ] && continue
+            last=$(gh api "repos/${{ github.repository }}/commits?sha=$b&per_page=1" \
+              --jq '.[0].commit.committer.date')
+            days=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 ))
+            if [ "$days" -gt 14 ]; then
+              echo "STALE: $b ($days days)"
+            fi
+          done
+        env:
+          GH_TOKEN: ${{ github.token }}
