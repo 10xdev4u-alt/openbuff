@@ -132,6 +132,16 @@ const CLAUDE_DRIVER_KIND = ProviderDriverKind.make("claudeAgent");
 const CURSOR_DRIVER_KIND = ProviderDriverKind.make("cursor");
 const GROK_DRIVER_KIND = ProviderDriverKind.make("grok");
 const OPENCODE_DRIVER_KIND = ProviderDriverKind.make("opencode");
+const FREEBUFF_DRIVER_KIND = ProviderDriverKind.make("freebuff");
+
+/**
+ * Freebuff's free tier is pinned server-side to one model
+ * (`FREEBUFF_FREE_MODEL` in the server adapter — currently
+ * deepseek/deepseek-v4-flash). Contracts cannot import from apps, so this
+ * default mirrors that pin and must move with it. The previous
+ * `gpt-5.6-sol` value was a paid model the free tier cannot run.
+ */
+export const DEFAULT_FREEBUFF_FREE_MODEL = "deepseek/deepseek-v4-flash";
 
 export const DEFAULT_MODEL = "gpt-5.6-sol";
 
@@ -153,6 +163,7 @@ export const DEFAULT_MODEL_BY_PROVIDER: Partial<Record<ProviderDriverKind, strin
   [CURSOR_DRIVER_KIND]: "auto",
   [GROK_DRIVER_KIND]: "grok-build",
   [OPENCODE_DRIVER_KIND]: "openai/gpt-5",
+  [FREEBUFF_DRIVER_KIND]: DEFAULT_FREEBUFF_FREE_MODEL,
 };
 
 /** Per-provider text generation model defaults. */

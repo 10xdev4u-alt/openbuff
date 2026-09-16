@@ -1,5 +1,13 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { DEFAULT_MODEL, ProjectId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
+import {
+  DEFAULT_MODEL,
+  DEFAULT_MODEL_BY_PROVIDER,
+  DEFAULT_SERVER_SETTINGS,
+  ProjectId,
+  ProviderDriverKind,
+  ProviderInstanceId,
+  ThreadId,
+} from "@t3tools/contracts";
 import { assert, it } from "@effect/vitest";
 import * as Crypto from "effect/Crypto";
 import * as Deferred from "effect/Deferred";
@@ -15,12 +23,50 @@ import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngi
 import * as ProjectionSnapshotQuery from "./orchestration/Services/ProjectionSnapshotQuery.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
+import * as ServerSettings from "./serverSettings.ts";
 
 it("uses the canonical Codex default for auto-bootstrapped model selection", () => {
   assert.deepStrictEqual(ServerRuntimeStartup.getAutoBootstrapDefaultModelSelection(), {
     instanceId: ProviderInstanceId.make("codex"),
     model: DEFAULT_MODEL,
   });
+});
+
+it("no-arg auto-bootstrap selection is unchanged (codex default)", () => {
+  assert.deepStrictEqual(ServerRuntimeStartup.getAutoBootstrapDefaultModelSelection(), {
+    instanceId: ProviderInstanceId.make("codex"),
+    model: DEFAULT_MODEL,
+  });
+});
+
+it("auto-bootstrap selection honors an enabled provider and its per-driver default", () => {
+  const settings = {
+    ...DEFAULT_SERVER_SETTINGS,
+    providers: Object.fromEntries(
+      Object.entries(DEFAULT_SERVER_SETTINGS.providers).map(([driver, provider]) => [
+        driver,
+        { ...provider, enabled: driver === "freebuff" },
+      ]),
+    ),
+  } as typeof DEFAULT_SERVER_SETTINGS;
+  const selection = ServerRuntimeStartup.getAutoBootstrapDefaultModelSelection(settings);
+  assert.strictEqual(selection.instanceId, ProviderInstanceId.make("freebuff"));
+  assert.strictEqual(
+    selection.model,
+    DEFAULT_MODEL_BY_PROVIDER[ProviderDriverKind.make("freebuff")],
+  );
+});
+
+it("auto-bootstrap selection ignores disabled providers", () => {
+  const settings = {
+    ...DEFAULT_SERVER_SETTINGS,
+    providers: {
+      ...DEFAULT_SERVER_SETTINGS.providers,
+      freebuff: { ...DEFAULT_SERVER_SETTINGS.providers.freebuff, enabled: false },
+    },
+  } as typeof DEFAULT_SERVER_SETTINGS;
+  const selection = ServerRuntimeStartup.getAutoBootstrapDefaultModelSelection(settings);
+  assert.strictEqual(selection.instanceId, ProviderInstanceId.make("codex"));
 });
 
 it.effect("enqueueCommand waits for readiness and then drains queued work", () =>
@@ -172,6 +218,7 @@ it.effect("resolveAutoBootstrapWelcomeTargets returns existing project and threa
         streamDomainEvents: Stream.empty,
         latestSequence: Effect.succeed(0),
       } satisfies OrchestrationEngine.OrchestrationEngineService["Service"]),
+      Effect.provide(ServerSettings.layerTest()),
       Effect.provide(NodeServices.layer),
     );
 
@@ -217,6 +264,7 @@ it.effect("resolveAutoBootstrapWelcomeTargets creates a project and thread when 
         streamDomainEvents: Stream.empty,
         latestSequence: Effect.succeed(0),
       } satisfies OrchestrationEngine.OrchestrationEngineService["Service"]),
+      Effect.provide(ServerSettings.layerTest()),
       Effect.provide(NodeServices.layer),
     );
 
@@ -277,5 +325,5 @@ it.effect("resolveAutoBootstrapWelcomeTargets preserves typed UUID generation fa
 
     assert.strictEqual(error, uuidError);
     assert.deepStrictEqual(yield* Ref.get(dispatchCalls), []);
-  }).pipe(Effect.provide(NodeServices.layer)),
+  }).pipe(Effect.provide(ServerSettings.layerTest()), Effect.provide(NodeServices.layer)),
 );
