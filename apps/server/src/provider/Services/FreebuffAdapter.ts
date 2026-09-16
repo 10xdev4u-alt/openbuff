@@ -86,6 +86,7 @@ import type { FreebuffSettings } from "@t3tools/contracts";
 import {
   classifySessionPoll,
   establishFreebuffSession,
+  formatModelUnavailableProse,
   installFreebuffFetchInterceptor,
   pollFreebuffSession,
   runWithFreebuffSession,
@@ -487,11 +488,19 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
           if (admission.status !== "active" || admission.instanceId === undefined) {
             state.activeTurn = undefined;
             state.session = { ...state.session, status: "ready", updatedAt: nowIso() };
+            // Gate refusals get their upstream-documented prose; everything
+            // else keeps the generic status + message shape.
+            const detail =
+              admission.status === "model_unavailable"
+                ? formatModelUnavailableProse(admission)
+                : admission.status === "model_locked"
+                  ? `Freebuff is already running ${admission.currentModel ?? "another model"} for you. Finish that session (or retry) before switching to ${admission.requestedModel ?? "the requested model"}.`
+                  : `Freebuff could not start a free session (${admission.status}). ${admission.message ?? "Try again shortly."}`;
             return yield* Effect.fail(
               new ProviderAdapterRequestError({
                 provider: "freebuff",
                 method: "sendTurn",
-                detail: `Freebuff could not start a free session (${admission.status}). ${admission.message ?? "Try again shortly."}`,
+                detail,
               }),
             );
           }

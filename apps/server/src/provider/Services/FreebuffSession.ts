@@ -101,6 +101,20 @@ export interface FreebuffSessionResponse {
   /** Freebucks meter. `null` (vs absent) means the block exists but could not
    *  refresh — consumers must CLEAR stale balances on null. */
   readonly freebucks?: FreebuffSessionFreebucks | null;
+  // --- 409 gate bodies (see FreebuffSessionRequestError for hard errors) ---
+  /** `model_locked`: a session is already active on this model upstream. */
+  readonly currentModel?: string;
+  /** The model the caller asked for (gate bodies echo it). */
+  readonly requestedModel?: string;
+  /** `model_unavailable`: server-authored prose floor (quoted UTC, zone named). */
+  readonly availableHours?: string;
+  /** `model_unavailable`: computable return instant when one exists — render
+   *  it in the READER's timezone; absent means prose is all there is. */
+  readonly availableAt?: string;
+  /** `model_unavailable`: pro-only refusal (the only one an upgrade fixes). */
+  readonly requiresSubscription?: boolean;
+  /** `model_unavailable`: model withdrawn from free mode — permanent. */
+  readonly withdrawn?: boolean;
 }
 
 /** Minimal projection of upstream `FreebuffFreeWindowsInfo`. */
@@ -385,6 +399,36 @@ export type SessionPollClass =
  * unknown statuses never escalate to a fatal class (a weird poll must never
  * kill a live session; the 429 lesson).
  */
+/**
+ * Human prose for a `model_unavailable` refusal (issue #27, PR 2b). Upstream
+ * rule: `availableHours` is the prose floor, quoted verbatim (the server
+ * already names its zone); `availableAt` is an ISO instant precisely because
+ * only the client knows the reader's timezone — so it renders locally, and
+ * when it is absent (older servers) no time is invented.
+ */
+export function formatModelUnavailableProse(
+  body: Pick<FreebuffSessionResponse, "availableHours" | "availableAt">,
+  nowMs: number = Date.now(),
+): string {
+  const floor = body.availableHours ?? "not available right now";
+  const opening = `This model is closed for free sessions right now — ${floor}.`;
+  if (body.availableAt === undefined) {
+    return opening;
+  }
+  const target = Date.parse(body.availableAt);
+  if (Number.isNaN(target)) {
+    return opening;
+  }
+  if (target <= nowMs) {
+    return `${opening} It should be back any moment.`;
+  }
+  const local = new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(target));
+  return `${opening} It should be back around ${local}.`;
+}
+
 export function classifySessionPoll(res: FreebuffSessionResponse): SessionPollClass {
   switch (res.status) {
     case "active":
