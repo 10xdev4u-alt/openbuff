@@ -47,6 +47,75 @@ describe("ServerProvider", () => {
     expect(parsed.updateState).toBeUndefined();
   });
 
+  it("decodes an optional freebuff usage block on a provider snapshot", () => {
+    const parsed = decodeServerProvider({
+      ...baseProviderSnapshot,
+      driver: "freebuff",
+      instanceId: "freebuff",
+      usage: {
+        rateLimitsByModel: {
+          "deepseek/deepseek-v4-pro": {
+            pool: "premium-day",
+            poolLabel: "Premium sessions",
+            period: "pacific_day",
+            resetTimeZone: "America/Los_Angeles",
+            resetAt: "2026-09-17T07:00:00.000Z",
+            limit: 5,
+            recentCount: 2,
+            windowHours: 24,
+          },
+        },
+        freeWindows: {
+          dayUsed: 1,
+          dayLimit: 8,
+          weekUsed: 3,
+          weekLimit: 40,
+          monthUsed: 9,
+          monthLimit: 120,
+          dayResetAt: "2026-09-17T07:00:00.000Z",
+          monthResetAt: "2026-10-01T07:00:00.000Z",
+        },
+        freebucks: {
+          quotaExempt: false,
+          balance: 12.5,
+          daily: {
+            limit: 10,
+            spent: 4,
+            remaining: 6,
+            resetAt: "2026-09-17T07:00:00.000Z",
+            resetTimeZone: "America/Los_Angeles",
+          },
+          wallet: { balance: 6.5, monthlyBonus: 0 },
+          planId: null,
+          prices: { "openai/gpt-5.6-luna": 2 },
+        },
+      },
+    });
+
+    expect(parsed.usage?.freebucks?.balance).toBe(12.5);
+    expect(parsed.usage?.rateLimitsByModel?.["deepseek/deepseek-v4-pro"]?.pool).toBe(
+      "premium-day",
+    );
+    expect(parsed.usage?.freeWindows?.dayUsed).toBe(1);
+  });
+
+  it("keeps absent usage absent so legacy snapshots decode unchanged", () => {
+    const parsed = decodeServerProvider(baseProviderSnapshot);
+    expect(parsed.usage).toBeUndefined();
+  });
+
+  it("carries null freebucks through (clears stale balances, never undefined)", () => {
+    const parsed = decodeServerProvider({
+      ...baseProviderSnapshot,
+      driver: "freebuff",
+      instanceId: "freebuff",
+      usage: { freebucks: null },
+    });
+    expect(parsed.usage?.freebucks).toBeNull();
+    expect(parsed.usage?.rateLimitsByModel).toBeUndefined();
+    expect(parsed.usage?.freeWindows).toBeUndefined();
+  });
+
   it("defaults one-click update support when decoding older advisory snapshots", () => {
     const parsed = decodeServerProvider({
       instanceId: "codex",

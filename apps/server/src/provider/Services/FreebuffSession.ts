@@ -95,6 +95,46 @@ export interface FreebuffSessionResponse {
   readonly message?: string;
   /** Per-model pool status (admission + active poll bodies). */
   readonly rateLimitsByModel?: Record<string, FreebuffSessionQuotaRow>;
+  /** Session-window counters (admission + active poll bodies). Week/month are
+   *  display-only per upstream docs; `day` is the enforced window. */
+  readonly freeWindows?: FreebuffSessionFreeWindows;
+  /** Freebucks meter. `null` (vs absent) means the block exists but could not
+   *  refresh — consumers must CLEAR stale balances on null. */
+  readonly freebucks?: FreebuffSessionFreebucks | null;
+}
+
+/** Minimal projection of upstream `FreebuffFreeWindowsInfo`. */
+export interface FreebuffSessionFreeWindows {
+  readonly dayUsed: number;
+  readonly dayLimit: number;
+  readonly weekUsed: number;
+  readonly weekLimit: number;
+  readonly monthUsed: number;
+  readonly monthLimit: number;
+  readonly dayResetAt: string;
+  readonly monthResetAt: string;
+}
+
+/** Minimal projection of upstream `FreebuffFreebucksInfo`. */
+export interface FreebuffSessionFreebucks {
+  readonly quotaExempt?: boolean;
+  /** Spendable right now: `daily.remaining + wallet.balance`. */
+  readonly balance: number;
+  readonly daily: {
+    readonly limit: number;
+    readonly spent: number;
+    readonly remaining: number;
+    readonly resetAt: string;
+    readonly resetTimeZone?: string;
+  };
+  readonly wallet: {
+    readonly balance: number;
+    readonly monthlyBonus: number;
+    readonly nextBonusAt?: string;
+  };
+  readonly planId: string | null;
+  /** Session price per model id; only metered models appear. */
+  readonly prices: Record<string, number>;
 }
 
 /**
