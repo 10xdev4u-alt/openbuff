@@ -74,8 +74,10 @@ import type {
 } from "./ProviderAdapter.ts";
 import type { FreebuffSettings } from "@t3tools/contracts";
 import {
+  classifySessionPoll,
   establishFreebuffSession,
   installFreebuffFetchInterceptor,
+  pollFreebuffSession,
   runWithFreebuffSession,
 } from "./FreebuffSession.ts";
 
@@ -347,6 +349,83 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
             ...(modelSelection !== undefined ? { model: modelSelection } : {}),
           },
         } as ProviderRuntimeEvent);
+
+        // ── Turn-boundary session poll ──────────────────────────────────
+        // One compact GET when a session exists: catches a server-ended seat
+        // before a doomed turn (upstream grace semantics), never tight-polls
+        // by construction, and never kills the session on poll failure (the
+        // 429 lesson — unknown/failed polls proceed).
+        if (state.freebuffInstanceId !== undefined) {
+          const instanceId = state.freebuffInstanceId;
+          const poll = yield* Effect.tryPromise({
+            try: () =>
+              pollFreebuffSession(config.apiKey, instanceId, {
+                signal: abort.signal,
+              }),
+            catch: (cause) =>
+              new ProviderAdapterRequestError({
+                provider: "freebuff",
+                method: "sendTurn",
+                detail:
+                  cause instanceof Error
+                    ? cause.message
+                    : "Freebuff session poll failed.",
+              }),
+          }).pipe(Effect.orElseSucceed(() => null));
+          if (poll !== null) {
+            const cls = classifySessionPoll(poll);
+            switch (cls.kind) {
+              case "gone":
+                // Fully gone: clear so the admission block below rejoins via
+                // the admission POST (the user's own turn is the trigger —
+                // no retry loop).
+                state.freebuffInstanceId = undefined;
+                state.runState = undefined;
+                break;
+              case "grace": {
+                state.activeTurn = undefined;
+                state.session = { ...state.session, status: "ready", updatedAt: nowIso() };
+                const remaining =
+                  cls.graceRemainingMs !== undefined
+                    ? ` (~${Math.ceil(cls.graceRemainingMs / 1000)}s of grace left)`
+                    : "";
+                return yield* Effect.fail(
+                  new ProviderAdapterRequestError({
+                    provider: "freebuff",
+                    method: "sendTurn",
+                    detail: `Freebuff session ended${remaining}. In-flight work finishes, but new prompts need a fresh session — send another message to rejoin.`,
+                  }),
+                );
+              }
+              case "superseded":
+                state.gateState = "superseded";
+                state.activeTurn = undefined;
+                state.session = { ...state.session, status: "ready", updatedAt: nowIso() };
+                return yield* Effect.fail(
+                  new ProviderAdapterRequestError({
+                    provider: "freebuff",
+                    method: "sendTurn",
+                    detail:
+                      "Another OpenBuff session took over this account. Close the other session, then reload here.",
+                  }),
+                );
+              case "blocked":
+                state.activeTurn = undefined;
+                state.session = { ...state.session, status: "ready", updatedAt: nowIso() };
+                return yield* Effect.fail(
+                  new ProviderAdapterRequestError({
+                    provider: "freebuff",
+                    method: "sendTurn",
+                    detail: `Freebuff free mode is unavailable for this account (${cls.status}).`,
+                  }),
+                );
+              default:
+                // active / unknown: proceed — an odd poll must never kill a
+                // live session.
+                break;
+            }
+          }
+        }
 
         // ── Free-session admission ────────────────────────────────────────
         // Free-mode chat completions are gated behind an ACTIVE free session
