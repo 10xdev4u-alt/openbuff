@@ -61,7 +61,9 @@ jobs:
         run: |
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.event.pull_request.head.sha }}"
-          ! git log --format='%B' "$base..$head" | grep -qiE "generated (with|by)|powered by (codebuff|claude|gpt|copilot)"
+          # Footers live in the closing block by convention; scanning the whole
+          # body false-flags commits that discuss the rule itself.
+          ! git log --format='%B' "$base..$head" | tail -n 5 | grep -qiE "generated (with|by)|powered by (codebuff|claude|gpt|copilot)"
       - name: Conventional subject, max six words
         run: |
           base="${{ github.event.pull_request.base.sha }}"
