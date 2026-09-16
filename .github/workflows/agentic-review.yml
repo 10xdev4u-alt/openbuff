@@ -32,6 +32,7 @@ jobs:
           if [ "$n" -le 50 ]; then s="S"; elif [ "$n" -le 400 ]; then s="M"; else s="L"; fi
           echo "size=$s" >> "$GITHUB_OUTPUT"
       - name: Label PR
+        continue-on-error: true  # fork PRs: no write token for labels; skip, don't fail
         uses: actions-ecosystem/action-add-labels@v1
         with:
           labels: |
@@ -60,7 +61,7 @@ jobs:
         run: |
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.event.pull_request.head.sha }}"
-          ! git log --format='%B' "$base..$head" | grep -qi "generated with"
+          ! git log --format='%B' "$base..$head" | grep -qiE "generated (with|by)|powered by (codebuff|claude|gpt|copilot)"
       - name: Conventional subject, max six words
         run: |
           base="${{ github.event.pull_request.base.sha }}"
