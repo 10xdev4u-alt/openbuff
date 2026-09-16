@@ -88,13 +88,13 @@ vi.mock("../../state/session", () => ({
 import { EnvironmentProviderSettings } from "./ProviderSettingsPanel";
 
 const environmentId = EnvironmentId.make("remote-device");
-const codexId = ProviderInstanceId.make("codex");
-const customId = ProviderInstanceId.make("codex_work");
+const freebuffId = ProviderInstanceId.make("freebuff");
+const customFreebuffId = ProviderInstanceId.make("freebuff_work");
 
 function provider(): ServerProvider {
   return {
-    instanceId: codexId,
-    driver: ProviderDriverKind.make("codex"),
+    instanceId: freebuffId,
+    driver: ProviderDriverKind.make("freebuff"),
     enabled: true,
     installed: true,
     version: "1.0.0",
@@ -108,7 +108,7 @@ function provider(): ServerProvider {
       status: "behind_latest",
       currentVersion: "1.0.0",
       latestVersion: "1.1.0",
-      updateCommand: "pnpm add -g @openai/codex@latest",
+      updateCommand: "npx openbuff@latest",
       canUpdate: true,
       checkedAt: "2026-07-24T12:00:00.000Z",
       message: "Update available.",
@@ -166,7 +166,7 @@ describe("EnvironmentProviderSettings routing", () => {
     const providerCard = visitElements(
       panel,
       (element) =>
-        element.props.instanceId === codexId && typeof element.props.onRunUpdate === "function",
+        element.props.instanceId === freebuffId && typeof element.props.onRunUpdate === "function",
     );
     expect(providerCard).not.toBeNull();
     (providerCard?.props.onRunUpdate as (() => void) | undefined)?.();
@@ -174,7 +174,7 @@ describe("EnvironmentProviderSettings routing", () => {
 
     expect(commands.updateProvider).toHaveBeenCalledWith({
       environmentId,
-      input: { provider: ProviderDriverKind.make("codex"), instanceId: codexId },
+      input: { provider: ProviderDriverKind.make("freebuff"), instanceId: freebuffId },
     });
   });
 
@@ -184,7 +184,7 @@ describe("EnvironmentProviderSettings routing", () => {
 
     const inertWrapper = visitElements(panel, (element) => element.props.inert === true);
     expect(inertWrapper).not.toBeNull();
-    const providerCard = visitElements(panel, (element) => element.props.instanceId === codexId);
+    const providerCard = visitElements(panel, (element) => element.props.instanceId === freebuffId);
     expect(providerCard).not.toBeNull();
 
     const notice = visitElements(panel, (element) => element.props.title === "Limited permissions");
@@ -211,33 +211,33 @@ describe("EnvironmentProviderSettings routing", () => {
     settingsState.value = {
       ...DEFAULT_UNIFIED_SETTINGS,
       providerInstances: {
-        [codexId]: {
-          driver: ProviderDriverKind.make("codex"),
+        [freebuffId]: {
+          driver: ProviderDriverKind.make("freebuff"),
           enabled: false,
         },
-        [customId]: {
-          driver: ProviderDriverKind.make("codex"),
+        [customFreebuffId]: {
+          driver: ProviderDriverKind.make("freebuff"),
           enabled: true,
         },
       },
       providerModelPreferences: {
-        [customId]: { hiddenModels: ["hidden"], modelOrder: ["model"] },
+        [customFreebuffId]: { hiddenModels: ["hidden"], modelOrder: ["model"] },
       },
-      favorites: [{ provider: customId, model: "favorite" }],
+      favorites: [{ provider: customFreebuffId, model: "favorite" }],
     };
     const panel = renderPanel();
-    const customCard = visitElements(panel, (element) => element.props.instanceId === customId);
+    const customCard = visitElements(panel, (element) => element.props.instanceId === customFreebuffId);
     expect(customCard).not.toBeNull();
     (customCard?.props.onDelete as (() => void) | undefined)?.();
 
     expect(settingsState.updateSettings).toHaveBeenLastCalledWith({
       providerInstances: {
-        [codexId]: settingsState.value.providerInstances?.[codexId],
+        [freebuffId]: settingsState.value.providerInstances?.[freebuffId],
       },
     });
 
     settingsState.updateSettings.mockClear();
-    const defaultCard = visitElements(panel, (element) => element.props.instanceId === codexId);
+    const defaultCard = visitElements(panel, (element) => element.props.instanceId === freebuffId);
     const resetAction = defaultCard?.props.headerAction;
     const resetButton = visitElements(
       resetAction,
