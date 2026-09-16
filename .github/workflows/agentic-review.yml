@@ -64,6 +64,27 @@ jobs:
           # Footers live in the closing block by convention; scanning the whole
           # body false-flags commits that discuss the rule itself.
           ! git log --format='%B' "$base..$head" | tail -n 5 | grep -qiE "generated (with|by)|powered by (codebuff|claude|gpt|copilot)"
+      - name: No vendor names in subjects or PR titles
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          bad=0
+          while read -r subj; do
+            if echo "$subj" | grep -qiE "codebuff|claude|anthropic|openai|copilot|cursor|grok"; then
+              echo "::error::vendor attribution in commit subject: $subj"; bad=1
+            fi
+          done < <(git log --format='%s' --no-merges "$base..$head")
+          title="${{ github.event.pull_request.title }}"
+          if echo "$title" | grep -qiE "codebuff|claude|anthropic|openai|copilot|cursor|grok"; then
+            echo "::error::vendor attribution in PR title: $title"; bad=1
+          fi
+          # Bodies: role names preferred. Warn on vendor mentions so deps can
+          # be named when unavoidable, but attribution never happens.
+          for c in $(git log --format='%H' --no-merges "$base..$head"); do
+            git log -1 --format=%B "$c" | grep -qiE "codebuff|claude|anthropic|openai|copilot" \
+              && echo "::warning::vendor term in body of $c — refer to dependencies by role (the SDK, upstream, the session API)" || true
+          done
+          exit $bad
       - name: Conventional subject, max six words
         run: |
           base="${{ github.event.pull_request.base.sha }}"

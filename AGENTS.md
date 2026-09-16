@@ -35,7 +35,8 @@ Any worker agent may spawn subagents for research/verification, but **only Build
 6. **COMMIT** — conventional commits, **subject ≤ 6 words**, type from `feat|fix|refactor|docs|test|chore|perf|ci|build|style|revert`. Body: problem → fix, imperative mood.
    - **Co-author line on every commit, exactly one:**
      `Co-Authored-By: the-ai-developer <88466089+the-ai-developer@users.noreply.github.com>`
-   - **No "Generated with" footers, no tool attribution, no robot emojis in commits, PRs, or PR bodies. Ever.**
+   - **No "Generated/Generated with/by" footers, no tool or vendor attribution, no robot emojis in commits, PRs, or PR bodies. Ever.**
+   - **Vendor names never appear in commit subjects or PR titles** (hard CI fail). Bodies refer to dependencies by role — "the SDK", "upstream", "the session API" — not by vendor. The guard warns on vendor terms in bodies (identifiers may occasionally require them; attribution never does).
 7. **VALIDATE LOCALLY** — typecheck + targeted tests + lint for touched scope; paste real output into the PR (never "should work"). Repo-wide checks stay to CI.
 8. **PUSH + OPEN PR** — template followed; scope = one concern; link the issue (`Closes #N`); screenshots/video for UI changes.
 9. **REVIEW** — request **the-ai-developer**. Address every finding (or rebut with evidence). Merge only on approval.
@@ -126,6 +127,7 @@ An empty database is a bad test. Seed your worktree `.t3` by copying from `~/.t3
 
 - Conventional commits only; subjects ≤ 6 words after type; imperative body.
 - Every commit co-authored by **the-ai-developer only** (trailer in 1.2.6).
+- Vendor names never appear in commit subjects or PR titles; bodies use role names for dependencies.
 - Merge strategy: **merge commit**; squash/rebase prohibited.
 - Reviewer of record: **the-ai-developer** on every PR.
 - Issues are the unit of work; PRs reference exactly one issue; research lands in the issue, evidence lands in the PR.

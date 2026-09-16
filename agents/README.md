@@ -15,7 +15,7 @@ Enterprise software factory workers. Charter of record: [`AGENTS.md`](../AGENTS.
 
 ## Shared contracts
 
-1. **Identity.** All commits: author `10xdev4u-alt <10xdev4u@gmail.com>`; co-author trailer exactly one: `Co-Authored-By: the-ai-developer <88466089+the-ai-developer@users.noreply.github.com>`. No "Generated with" footers or tool attribution anywhere.
+1. **Identity.** All commits: author `10xdev4u-alt <10xdev4u@gmail.com>`; co-author trailer exactly one: `Co-Authored-By: the-ai-developer <88466089+the-ai-developer@users.noreply.github.com>`. No "Generated with" footers or tool attribution anywhere. Vendor names never appear in commit subjects or PR titles (CI hard-fail); bodies refer to dependencies by role.
 2. **Commits.** Conventional, subject ≤ 6 words after type. Merge commits only (no squash, no rebase-merge).
 3. **Issues first.** No code without an issue carrying acceptance criteria. Research lands in issues; evidence lands in PRs.
 4. **Evidence or silence.** Claims cite `file:line` or test output. Unverified claims are labeled `UNVERIFIED`.
