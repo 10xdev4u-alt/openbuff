@@ -40,7 +40,7 @@
 | `FreebuffDriver` | Only driver under `provider/Drivers/`. `create` materializes adapter closure + snapshot; no subprocess. Auth resolution: settings override → `CODEBUFF_API_KEY` env → `~/.config/manicode/credentials.json` (`default.authToken`) | dir listing `provider/Drivers/`, `FreebuffDriver.ts:24,62-117` |
 | `makeHeuristicTextGeneration` | Local stubs for commit-msg/PR/branch/thread-title (no model call) | `FreebuffDriver.ts:120-152` |
 | `FreebuffAdapter` | Transliterates SDK callbacks → canonical `ProviderRuntimeEvent` (delta/tool_call/tool_result/completed/aborted/failed); stores `RunState` per thread for resume; `readThread` reconstructs from turns; `rollbackThread` = no-op v1; `pendingApprovals` map + `autoApproveCommands` for command approvals | `FreebuffAdapter.ts:1-22,86-115,117+` |
-| `FreebuffSession` | Free-tier admission: POST `https://www.codebuff.com/api/v1/freebuff/session` → `instanceId`; `installFreebuffFetchInterceptor` wraps `globalThis.fetch` to inject `codebuff_metadata.freebuff_instance_id` via `AsyncLocalStorage`; pinned model `deepseek/deepseek-v4-flash` | `FreebuffSession.ts:8-35,44,52,59-71` |
+| `FreebuffSession` | Free-tier admission: POST `https://www.codebuff.com/api/v1/freebuff/session/admission` (dedicated route) → `instanceId`; DELETE release still uses `/api/v1/freebuff/session`; `installFreebuffFetchInterceptor` wraps `globalThis.fetch` to inject `codebuff_metadata.freebuff_instance_id` via `AsyncLocalStorage`; pinned model `deepseek/deepseek-v4-flash` | `FreebuffSession.ts:8-35,44,52,59-71` |
 | Free-mode gates (3) | (1) canonical system-prompt marker, (2) allowlisted agent+model, (3) active session instance id — else `waiting_room_required` | `FreebuffSession.ts:8-19` |
 
 ### 1.4 DB tables (SQLite, migrations 001–040)
@@ -77,7 +77,7 @@ Core: `orchestration_events` (m1), `orchestration_command_receipts` (m2), checkp
 | `FreebuffAdapter` | CALLS | `@codebuff/sdk` `CodebuffClient.run` (1 run/turn) | `FreebuffAdapter.ts:3-6` |
 | `FreebuffAdapter` | USES | `FreebuffSession.establish/interceptor` | `FreebuffAdapter.ts:73-75` |
 | `FreebuffDriver` | BUILDS | `makeFreebuffAdapter` + `buildServerProvider` snapshot | `FreebuffDriver.ts:30-33` |
-| `FreebuffSession` | HTTP_POST | codebuff.com `/api/v1/freebuff/session` | `FreebuffSession.ts:31-35,87` |
+| `FreebuffSession` | HTTP_POST | codebuff.com `/api/v1/freebuff/session/admission` (release DELETE: `/api/v1/freebuff/session`) | `FreebuffSession.ts:31-35,87` |
 | SDK chat calls | CARRY | `codebuff_metadata.freebuff_instance_id` | `FreebuffSession.ts:24-29` |
 | CheckpointReactor | WRITES | git hidden refs + `checkpoint diff blobs` | glossary.md:120+, m3 |
 | web | DEPENDS_ON | `@t3tools/contracts`, `client-runtime` | `apps/web/package.json:38-41` |
@@ -119,7 +119,7 @@ flowchart LR
   end
 
   SDK --> CB["codebuff.com backend (free tier)"]
-  FS -->|POST /api/v1/freebuff/session| CB
+  FS -->|POST /api/v1/freebuff/session/admission| CB
   CRED -->|authToken| DRV["FreebuffDriver.resolveAuth"]
   DRV --> AD
   WEB -->|typed WS| WS
