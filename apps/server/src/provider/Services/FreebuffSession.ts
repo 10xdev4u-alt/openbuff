@@ -68,6 +68,20 @@ const turnContext = new AsyncLocalStorage<FreebuffTurnContext>();
  */
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
+/**
+ * One per-model quota row from the session response (`rateLimitsByModel`).
+ * Minimal projection of upstream `FreebuffSessionRateLimit`: `pool` is an
+ * OPAQUE token (group rows by it, never match on values), `poolLabel` is
+ * server-authored display copy. Unknown fields pass through untouched.
+ */
+export interface FreebuffSessionQuotaRow {
+  readonly pool?: string;
+  readonly poolLabel?: string;
+  readonly limit: number;
+  readonly recentCount: number;
+  readonly resetAt: string;
+}
+
 /** Server response shape for `/api/v1/freebuff/session` (fields we use). */
 export interface FreebuffSessionResponse {
   readonly status: string;
@@ -79,6 +93,8 @@ export interface FreebuffSessionResponse {
   readonly gracePeriodEndsAt?: string;
   readonly gracePeriodRemainingMs?: number;
   readonly message?: string;
+  /** Per-model pool status (admission + active poll bodies). */
+  readonly rateLimitsByModel?: Record<string, FreebuffSessionQuotaRow>;
 }
 
 /**
