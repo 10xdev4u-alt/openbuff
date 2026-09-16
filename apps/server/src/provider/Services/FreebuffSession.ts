@@ -76,6 +76,8 @@ export interface FreebuffSessionResponse {
   readonly accessTier?: string;
   readonly expiresAt?: string;
   readonly remainingMs?: number;
+  readonly gracePeriodEndsAt?: string;
+  readonly gracePeriodRemainingMs?: number;
   readonly message?: string;
 }
 
@@ -86,6 +88,9 @@ export interface FreebuffSessionResponse {
  */
 export const FREEBUFF_SESSION_ADMISSION_PATH =
   "/api/v1/freebuff/session/admission";
+
+/** Session poll/release path (GET poll, DELETE release). */
+export const FREEBUFF_SESSION_PATH = "/api/v1/freebuff/session";
 
 /** User-facing message when the server does not implement the admission route. */
 export const FREEBUFF_SESSION_UNSUPPORTED_MESSAGE =
@@ -240,6 +245,115 @@ export async function establishFreebuffSession(
   }
 
   return (await readBody()) ?? { status: "none" };
+}
+
+/**
+ * Poll the session (GET on the session path) with the compact header —
+ * mirrors the vendor CLI: instance id + compact are GET-only headers, 404
+ * means the session row is gone (→ `none`), 403 terminal bodies return for
+ * classification, hard errors throw typed with retry-after.
+ */
+export async function pollFreebuffSession(
+  token: string,
+  instanceId: string,
+  opts: { compact?: boolean; signal?: AbortSignal; fetch?: typeof fetch } = {},
+): Promise<FreebuffSessionResponse> {
+  const doFetch = opts.fetch ?? nativeFetch;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    "x-freebuff-instance-id": instanceId,
+  };
+  if (opts.compact !== false) {
+    headers["x-freebuff-compact-session"] = "1";
+  }
+  const init: RequestInit = { method: "GET", headers };
+  if (opts.signal !== undefined) {
+    init.signal = opts.signal;
+  }
+  const response = await doFetch(`${FREEBUFF_API_BASE}${FREEBUFF_SESSION_PATH}`, init);
+
+  if (response.status === 404) {
+    return { status: "none" };
+  }
+
+  const readBody = async (): Promise<FreebuffSessionResponse | null> =>
+    (await response.json().catch(() => null)) as FreebuffSessionResponse | null;
+  if (response.status === 403) {
+    const body = await readBody();
+    if (body && (body.status === "country_blocked" || body.status === "banned")) {
+      return body;
+    }
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    let errorCode: string | undefined;
+    try {
+      const body = JSON.parse(text) as { error?: unknown };
+      if (typeof body.error === "string") errorCode = body.error;
+    } catch {
+      // Non-JSON errors have no machine-readable code.
+    }
+    throw new FreebuffSessionRequestError(
+      `freebuff session GET failed: ${response.status} ${text.slice(0, 200)}`,
+      response.status,
+      parseRetryAfterMs(response.headers.get("retry-after")),
+      errorCode,
+    );
+  }
+
+  return (await readBody()) ?? { status: "none" };
+}
+
+/**
+ * Classification of one session poll, per the vendor's documented grace
+ * semantics: `ended` WITH `instanceId` = server-side grace window (chat
+ * finishes, no new prompts); `ended` WITHOUT = fully gone, rejoin via the
+ * admission POST.
+ */
+export type SessionPollClass =
+  | { readonly kind: "active"; readonly instanceId: string }
+  | {
+      readonly kind: "grace";
+      readonly instanceId: string;
+      readonly graceEndsAt?: string | undefined;
+      readonly graceRemainingMs?: number | undefined;
+    }
+  | { readonly kind: "gone" }
+  | { readonly kind: "superseded" }
+  | { readonly kind: "blocked"; readonly status: string }
+  | { readonly kind: "unknown"; readonly status: string };
+
+/**
+ * Pure classifier over a poll response — no I/O, fake-clock testable, and
+ * unknown statuses never escalate to a fatal class (a weird poll must never
+ * kill a live session; the 429 lesson).
+ */
+export function classifySessionPoll(res: FreebuffSessionResponse): SessionPollClass {
+  switch (res.status) {
+    case "active":
+      return res.instanceId !== undefined
+        ? { kind: "active", instanceId: res.instanceId }
+        : { kind: "unknown", status: res.status };
+    case "ended":
+      return res.instanceId !== undefined
+        ? {
+            kind: "grace",
+            instanceId: res.instanceId,
+            graceEndsAt: res.gracePeriodEndsAt,
+            graceRemainingMs: res.gracePeriodRemainingMs,
+          }
+        : { kind: "gone" };
+    case "none":
+      return { kind: "gone" };
+    case "superseded":
+      return { kind: "superseded" };
+    case "banned":
+    case "country_blocked":
+      return { kind: "blocked", status: res.status };
+    default:
+      return { kind: "unknown", status: res.status };
+  }
 }
 
 /** Best-effort release of the session slot (DELETE). Never throws. */
