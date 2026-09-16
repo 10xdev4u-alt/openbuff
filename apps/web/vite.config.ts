@@ -17,6 +17,11 @@ import { loadRepoEnv } from "../../scripts/lib/public-config";
 const repoEnv = loadRepoEnv();
 Object.assign(process.env, repoEnv);
 
+const {
+  resolveDevBindHost,
+  probeV6WildcardSupport,
+} = await import("./src/devBindHost");
+
 // Single-origin dev is signalled positively, because it cannot be inferred
 // from the absence of VITE_HTTP_URL/VITE_WS_URL: the runner deletes those keys
 // but `loadRepoEnv` merges `.env`/`.env.local` *underneath* the process env, so
@@ -28,7 +33,6 @@ const isSingleOriginDev = process.env.T3CODE_SINGLE_ORIGIN_DEV === "1";
 
 const port = Number(process.env.PORT ?? 5733);
 const explicitHost = process.env.HOST?.trim();
-const host = explicitHost || "localhost";
 const configuredWsUrl = isSingleOriginDev ? undefined : process.env.VITE_WS_URL?.trim();
 const configuredHttpUrl = isSingleOriginDev ? undefined : process.env.VITE_HTTP_URL?.trim();
 const configuredRelayUrl = repoEnv.VITE_T3CODE_RELAY_URL?.trim() || "";
@@ -151,7 +155,13 @@ const configuredAllowedHosts = (process.env.T3CODE_DEV_ALLOWED_HOSTS ?? "")
   .filter((entry) => entry.length > 0);
 const allowedHosts = [".ts.net", ...configuredAllowedHosts];
 
-export default defineConfig(() => {
+export default defineConfig(async () => {
+  // Resolve the dev bind host: explicit HOST wins; otherwise probe for IPv6
+  // and dual-stack bind `::` (falling back to `0.0.0.0` on v4-only kernels).
+  // A bare `localhost` cannot dual-bind — Node uses only the first resolved
+  // address, so 127.0.0.1 or ::1 goes dark depending on resolution order.
+  const supportsV6Wildcard = explicitHost ? true : await probeV6WildcardSupport();
+  const host = resolveDevBindHost(explicitHost, supportsV6Wildcard);
   return {
     assetsInclude: ["**/*.wasm"],
     plugins: [
