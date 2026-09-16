@@ -13,6 +13,7 @@ import * as Crypto from "effect/Crypto";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as PlatformError from "effect/PlatformError";
 import * as Ref from "effect/Ref";
@@ -218,8 +219,7 @@ it.effect("resolveAutoBootstrapWelcomeTargets returns existing project and threa
         streamDomainEvents: Stream.empty,
         latestSequence: Effect.succeed(0),
       } satisfies OrchestrationEngine.OrchestrationEngineService["Service"]),
-      Effect.provide(ServerSettings.layerTest()),
-      Effect.provide(NodeServices.layer),
+      Effect.provide(Layer.merge(ServerSettings.layerTest(), NodeServices.layer)),
     );
 
     assert.deepStrictEqual(targets, {
@@ -264,8 +264,7 @@ it.effect("resolveAutoBootstrapWelcomeTargets creates a project and thread when 
         streamDomainEvents: Stream.empty,
         latestSequence: Effect.succeed(0),
       } satisfies OrchestrationEngine.OrchestrationEngineService["Service"]),
-      Effect.provide(ServerSettings.layerTest()),
-      Effect.provide(NodeServices.layer),
+      Effect.provide(Layer.merge(ServerSettings.layerTest(), NodeServices.layer)),
     );
 
     assert.equal(typeof targets.bootstrapProjectId, "string");
@@ -325,5 +324,5 @@ it.effect("resolveAutoBootstrapWelcomeTargets preserves typed UUID generation fa
 
     assert.strictEqual(error, uuidError);
     assert.deepStrictEqual(yield* Ref.get(dispatchCalls), []);
-  }).pipe(Effect.provide(ServerSettings.layerTest()), Effect.provide(NodeServices.layer)),
+  }).pipe(Effect.provide(Layer.merge(ServerSettings.layerTest(), NodeServices.layer))),
 );
