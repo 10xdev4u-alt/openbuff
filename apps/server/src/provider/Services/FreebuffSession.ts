@@ -1,3 +1,8 @@
+// @effect-diagnostics globalDate:off
+// Plain (non-Effect) module: retry-after HTTP-date parsing needs a wall-clock
+// "now" for a one-shot header decode. Threading Effect Clock through it for a
+// single Date.now() is disproportionate; this matches the sanctioned opt-out
+// used by serviceLauncher.ts and usageAggregation.ts.
 /**
  * FreebuffSession — free-tier session admission + request tie-in.
  *
@@ -19,22 +24,22 @@
  * cannot inject `freebuff_instance_id` into `codebuff_metadata`. This module
  * supplies both:
  *
- *   - `establishFreebuffSession` POSTs `/api/v1/freebuff/session` (the same
- *     call the Freebuff CLI makes) and returns the server-assigned
- *     `instanceId`.
+ *   - `establishFreebuffSession` POSTs the dedicated admission route
+ *     `/api/v1/freebuff/session/admission` (header-driven, body-less —
+ *     identical semantics to the vendor CLI's session API) and returns the
+ *     server-assigned `instanceId`.
  *   - `installFreebuffFetchInterceptor` wraps `globalThis.fetch` once. The
  *     SDK resolves `globalThis.fetch` lazily at request time, so the wrapper
  *     sees every chat-completion request and merges `freebuff_instance_id`
  *     into its `codebuff_metadata`. The instance id is read from an
  *     `AsyncLocalStorage` scope so concurrent turns never cross-contaminate.
  *
- * The wire protocol here was verified against the live backend and matches
- * the reference Freebuff2API bridges.
+ * The wire protocol here is ported from the vendor's own published sources
+ * (session API + constants), replacing earlier bridge-derived assumptions.
  *
  * @module provider/Services/FreebuffSession
  */
 import { AsyncLocalStorage } from "node:async_hooks";
-import * as Crypto from "node:crypto";
 
 export const FREEBUFF_API_BASE = "https://www.codebuff.com";
 
@@ -75,47 +80,166 @@ export interface FreebuffSessionResponse {
 }
 
 /**
- * Establish (or re-establish) a free session. Mirrors the Freebuff CLI's
- * admission call: POST with the model header and a client-generated instance
- * hint; the server returns the authoritative `instanceId` that subsequent
- * chat completions must carry.
+ * Dedicated admission route. Fails closed on servers predating these
+ * guarantees — we surface that as a reload/update error rather than silently
+ * degrading to the legacy session path.
+ */
+export const FREEBUFF_SESSION_ADMISSION_PATH =
+  "/api/v1/freebuff/session/admission";
+
+/** User-facing message when the server does not implement the admission route. */
+export const FREEBUFF_SESSION_UNSUPPORTED_MESSAGE =
+  "This server cannot safely start or resume your session yet. Reload or update and try again shortly. No purchase was made.";
+
+/** Machine-readable error code for the unsupported-server case. */
+export type FreebuffSessionErrorCode =
+  | "session_admission_unsupported"
+  | string;
+
+/** Typed failure from a hard session-API error (status + code + retry hint). */
+export class FreebuffSessionRequestError extends Error {
+  readonly status: number;
+  readonly errorCode?: string | undefined;
+  readonly retryAfterMs?: number | undefined;
+
+  constructor(
+    message: string,
+    status: number,
+    retryAfterMs?: number,
+    errorCode?: string,
+  ) {
+    super(message);
+    this.name = "FreebuffSessionRequestError";
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+    this.errorCode = errorCode;
+  }
+}
+
+/** `parseRetryAfterMs` equivalent: seconds, or an HTTP date → ms from now. */
+function parseRetryAfterMs(
+  value: string | null,
+  nowMs: number = Date.now(),
+): number | undefined {
+  if (value === null) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    const milliseconds = seconds * 1_000;
+    return Number.isFinite(milliseconds) ? Math.ceil(milliseconds) : undefined;
+  }
+  const dateMs = Date.parse(value);
+  return Number.isFinite(dateMs) ? Math.max(0, dateMs - nowMs) : undefined;
+}
+
+/** IANA timezone header the backend uses for free-window accounting. */
+function timeZoneHeaders(): Record<string, string> {
+  try {
+    return {
+      "x-fb-timezone": Intl.DateTimeFormat().resolvedOptions().timeZone,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Establish (or re-establish) a free session on the dedicated admission
+ * route. Mirrors the vendor CLI exactly: body-less POST driven entirely by
+ * headers — `x-freebuff-model`, `x-freebuff-wallet-spend-limit`,
+ * `x-freebuff-first-tab-discount`, timezone, Bearer auth. The instance id
+ * header belongs to GET/DELETE only and must NOT be sent on POST.
+ *
+ * Gate rejections (403/409/429 with typed bodies) are returned as normal
+ * responses so callers can classify; only hard errors throw.
  */
 export async function establishFreebuffSession(
   token: string,
-  opts: { model?: string; instanceHint?: string; signal?: AbortSignal } = {},
+  opts: {
+    model?: string;
+    walletSpendLimit?: number;
+    firstTabDiscount?: boolean;
+    signal?: AbortSignal;
+    fetch?: typeof fetch;
+  } = {},
 ): Promise<FreebuffSessionResponse> {
+  const doFetch = opts.fetch ?? nativeFetch;
   const model = opts.model ?? FREEBUFF_FREE_MODEL;
-  const instanceHint = opts.instanceHint ?? Crypto.randomUUID();
-  const init: RequestInit = {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "x-freebuff-model": model,
-      "x-freebuff-instance-id": instanceHint,
-    },
-    body: "{}",
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    ...timeZoneHeaders(),
+    "x-freebuff-first-tab-discount": opts.firstTabDiscount ? "1" : "0",
+    "x-freebuff-model": model,
+    "x-freebuff-wallet-spend-limit": String(opts.walletSpendLimit ?? 0),
   };
+  const init: RequestInit = { method: "POST", headers };
   if (opts.signal !== undefined) {
     init.signal = opts.signal;
   }
-  const response = await nativeFetch(
-    `${FREEBUFF_API_BASE}/api/v1/freebuff/session`,
-    init,
-  );
+  const response = await doFetch(`${FREEBUFF_API_BASE}${FREEBUFF_SESSION_ADMISSION_PATH}`, init);
 
-  // 404 means "no session row" — surface it as a `none` status rather than
-  // throwing, so callers can decide.
-  if (response.status === 404) {
-    return { status: "none" };
+  // The dedicated route fails closed: 404/405 means the server predates the
+  // guarantees the route exists to provide.
+  if (response.status === 404 || response.status === 405) {
+    throw new FreebuffSessionRequestError(
+      FREEBUFF_SESSION_UNSUPPORTED_MESSAGE,
+      response.status,
+      undefined,
+      "session_admission_unsupported",
+    );
   }
 
-  const body = (await response.json().catch(() => null)) as FreebuffSessionResponse | null;
+  // 403 terminal states (country/ban) and 409/429 gate states arrive as
+  // typed bodies — return them for classification instead of throwing.
+  const readBody = async (): Promise<FreebuffSessionResponse | null> =>
+    (await response.json().catch(() => null)) as FreebuffSessionResponse | null;
+  if (response.status === 403) {
+    const body = await readBody();
+    if (body && (body.status === "country_blocked" || body.status === "banned")) {
+      return body;
+    }
+  }
+  if (response.status === 409) {
+    const body = await readBody();
+    if (
+      body &&
+      (body.status === "model_locked" ||
+        body.status === "model_unavailable" ||
+        body.status === "first_tab_discount_changed" ||
+        body.status === "consent_required")
+    ) {
+      return body;
+    }
+  }
+  if (response.status === 429) {
+    const body = await readBody();
+    if (
+      body &&
+      (body.status === "rate_limited" ||
+        body.status === "spend_limited" ||
+        body.status === "ip_capped")
+    ) {
+      return body;
+    }
+  }
+
   if (!response.ok) {
-    const reason = body?.message ?? body?.status ?? `HTTP ${response.status}`;
-    throw new Error(`Freebuff session admission failed: ${reason}`);
+    const text = await response.text().catch(() => "");
+    let errorCode: string | undefined;
+    try {
+      const body = JSON.parse(text) as { error?: unknown };
+      if (typeof body.error === "string") errorCode = body.error;
+    } catch {
+      // Non-JSON errors have no machine-readable code.
+    }
+    throw new FreebuffSessionRequestError(
+      `freebuff session POST failed: ${response.status} ${text.slice(0, 200)}`,
+      response.status,
+      parseRetryAfterMs(response.headers.get("retry-after")),
+      errorCode,
+    );
   }
-  return body ?? { status: "none" };
+
+  return (await readBody()) ?? { status: "none" };
 }
 
 /** Best-effort release of the session slot (DELETE). Never throws. */
