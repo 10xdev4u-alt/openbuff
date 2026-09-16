@@ -1,147 +1,131 @@
-# T3 Code
+# OpenBuff — Engineering Charter & Factory Operations Manual
 
-T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs (Codex, Claude Code, Cursor, Grok, OpenCode) and serves web, desktop, and mobile clients.
+**OpenBuff** is the open-source, ad-free web experience for the Freebuff agent: t3 Code's UI, one engine (`@codebuff/sdk`). One command (`npx openbuff@latest`) starts a local server + web app working on your files — chat, tool calls, diffs, terminals, turn checkpoints.
 
-You can think of T3 Code as an open source "bring-your-own-subscription" alternative to apps like Claude Desktop, Codex App, Cursor Glass and Conductor.
+You can think of OpenBuff as the community-run, bring-your-own-free-tier alternative to closed agent apps.
 
-## What makes T3 Code special?
+---
 
-We have over 100,000 users who love T3 Code. It's important we maintain the things they love as we continue to iterate on the product. Here's a brief list of the things we can never compromise on.
+## Part 1 — The Factory: Agentic Git Issues-PR System
 
-### 1. Open at the core
+This repository is built by an **agent fleet**, not ad-hoc commits. Every change follows one loop. Nothing ships outside it.
 
-T3 Code is truly open. We share our roadmap, we share how we think about things, and of course we share all our code. A large number of our users run forks. We work in the open, and should strive to stay that way.
+### 1.1 Fleet roster (see `agents/` for full briefs)
 
-### 2. Performance without compromise
+| Agent | Role | Acts as |
+|---|---|---|
+| **Builder** | Writes code + tests, follows the PR loop | committer (co-author: the-ai-developer) |
+| **Reviewer** (`the-ai-developer`) | Reviews every PR; requests changes before approval | PR reviewer |
+| **Architect** | Owns ADRs, boundaries, performance budget | issue author `architect` |
+| **Protocol** | Owns the Freebuff wire contract, upstream deltas | issue author `protocol` |
+| **Security** | Threat-models diffs, guards secrets/creds | issue author `security` |
+| **Perf** | Renders perf regressions; proposes perf fixes | issue author `perf` |
+| **Docs** | Keeps docs truthful; runs the unslop pass | issue author `docs` |
+| **Operator** | CI, releases, branch hygiene, dashboards | issue author `operator` |
 
-Lots of apps have gotten bogged down with bad tech decisions and "slop". We have not, and we're proud of the performance of T3 Code. We regularly audit for performance regressions, often caused by sending too much data over websockets, css animations causing gpu spikes, lists being hard to render, and more. Make sure all changes are considerate of performance impact.
+Any worker agent may spawn subagents for research/verification, but **only Builder commits** and **only Reviewer approves**. Opinions route through issues.
 
-### 3. Remote ready
+### 1.2 The PR loop (mandatory, in order)
 
-The architecture of T3 Code's websocket layer (npx t3) enables a lot of awesome remote features. These have become core to the product. Whether users are connecting directly over their local network, using Tailscale, or leaning in fully with T3 Connect (our tunnel solution, also in this repo), we need to make sure new features are properly supported.
+1. **RESEARCH** — gather evidence (code, upstream sources in `.repos/`, logs, benchmarks). Cite `file:line`.
+2. **EVALUATE** — multi-POV pass (architect / hacker / maintainer / user / operator / future-self). Conflicts stated as explicit tradeoffs with a reasoned pick.
+3. **ISSUE** — file or claim an issue first (`openbuff/` + `factory/` labels, acceptance criteria + risk notes). No work without an issue.
+4. **VALIDATE** — design review on the issue: is the approach the smallest correct fix? Subagents may attack the plan before a line is written.
+5. **IMPLEMENT** — branch from fresh `main`: `<type>/<issue#>-<slug>`. TDD where tests exist; smallest diff that passes all POVs.
+6. **COMMIT** — conventional commits, **subject ≤ 6 words**, type from `feat|fix|refactor|docs|test|chore|perf|ci|build|style|revert`. Body: problem → fix, imperative mood.
+   - **Co-author line on every commit, exactly one:**
+     `Co-Authored-By: the-ai-developer <88466089+the-ai-developer@users.noreply.github.com>`
+   - **No "Generated with" footers, no tool attribution, no robot emojis in commits, PRs, or PR bodies. Ever.**
+7. **VALIDATE LOCALLY** — typecheck + targeted tests + lint for touched scope; paste real output into the PR (never "should work"). Repo-wide checks stay to CI.
+8. **PUSH + OPEN PR** — template followed; scope = one concern; link the issue (`Closes #N`); screenshots/video for UI changes.
+9. **REVIEW** — request **the-ai-developer**. Address every finding (or rebut with evidence). Merge only on approval.
+10. **MERGE** — **merge commit, never squash, never rebase-merge** (history = research trail). Title: conventional, no "generated" wording.
+11. **CLEAN** — delete local + remote branch, prune stale branches, then re-sync `main` and repeat.
 
-### 4. Multi-surface
+### 1.3 Commit subject rule
 
-T3 Code has 3 key app surfaces: **web**, **desktop**, and **mobile**.
+Hard limit: **6 words or fewer** after the type prefix. Counts as words, not characters. Examples: `fix: route free-tier accounts correctly` (5) ✓ · `feat: add session gate classifier` (5) ✓ · `fix: satisfy Freebuff free-mode gates so turns produce responses` (9) ✗.
 
-**Web** is kind of two surfaces, as we have the public facing "app.t3.codes" as well as locally hosting the web app through the `npx t3` command. Both need to be supported by all new features where reasonable.
+### 1.4 Branch & PR hygiene
 
-**Desktop** is the main surface most users install first. It's a full Electron app that bundles the server runner as well. The desktop app can also be used as the host server, allowing remote connections from app.t3.codes or the mobile app.
+- Branch names: `<type>/<issue#>-<kebab-slug>` (e.g. `feat/42-gate-classifier`).
+- One PR = one concern. If the description says "also", split it.
+- Draft PRs allowed mid-research; never merge drafts.
+- Stale-branch sweep after every merge (`operator` owns the workflow; local manual sweep before starting new work).
 
-**Mobile** is a React Native app for both iOS and Android, available on the App Store and Google Play. The mobile app allows for connecting to any T3 Code server to control work remotely.
+### 1.5 Subagent usage (the fleet multiplier)
 
-## A note from Theo
+- Research fan-out: independent verification questions → parallel subagents, one question each, results cited back into the issue.
+- Adversarial pass: one subagent attacks the diff (injection, race, perf, UX edge) before review is requested.
+- Never let subagents commit, push, merge, or close anything. Read/analyze only.
 
-I like ambitious ideas, simple systems, and software that feels obvious. Do not preserve complexity just because it already exists. Do not introduce machinery because it looks architecturally impressive. Understand the real constraint, then fight for the smallest model that makes the correct behavior unsurprising.
+---
 
-Channel both "measure twice, cut once" and "yagni". Fight scope creep. Try to honor the dev's intent in both a minimal and realistic fashion.
+## Part 2 — Repository Reality (what is actually true here)
 
-The rest of this document is meant to help you navigate the codebase and make changes effectively. Think of these instructions less as "hard rules", more as "good defaults". The developer's preferences should be able to override anything here.
+OpenBuff is a **fork of pingdotgg/t3code** (MIT) trimmed to its web + server apps, with the five upstream provider CLIs (Codex, Claude, Cursor, Grok, OpenCode) replaced by a **single Freebuff driver** wrapping `@codebuff/sdk` in-process. **Upstream-t3 documentation claims (desktop, mobile, 5 providers, relay) are stale here** — verify against `apps/` before acting on prose.
 
-Of note: Most T3 Code contributions will come from T3 Code itself, often controlled remotely. This means you should be careful about accessing data, killing dev servers, and other things that may damage the T3 Code instance that the contributor is using.
+Glossary (project / workspace / thread / turn / activity / command / event / decider / projector / reactor / receipt): `docs/internals/glossary.md`.
 
-## A small glossary
+### 2.1 The three ways to hurt yourself
 
-We need to be on the same page with terminology. When communicating, use this language:
+1. **Killing by pattern.** Never `pkill -f`, `pgrep | kill`, or kill by name/path match. Kill only a PID captured at spawn (we keep them in `.freebuff/*.pid`) or a port owner whose `/proc/<pid>/cwd` you confirmed.
+2. **Writing to the live install.** `~/.t3/userdata` is the developer's real T3 database. Read/copy (`VACUUM INTO`) for test data — never open read-write, never run a server against it.
+3. **Baking in origins.** Never set `VITE_HTTP_URL`/`VITE_WS_URL` in dev. Dev is single-origin; Vite proxies `/api`, `/ws`, `/oauth`, `/.well-known`. Web dev binds IPv6 loopback — probe `localhost`, not `127.0.0.1`.
 
-- **you** means the agent reading this file and changing T3 Code.
-- **we, us, and maintainers** mean Theo, Julius and the people building T3 Code. These are who you are talking to now.
-- **user** means the person using T3 Code to direct coding agents.
-- **agent** means the coding agent a user runs inside T3 Code. Depending on context, that may also include you.
-- **provider** means the agent runtime or harness T3 Code talks to, such as Codex, Claude, Cursor, or OpenCode.
-- **client** means the web, desktop, or mobile UI.
-- **environment** means one running T3 server and the machine, filesystem, provider credentials, and state it owns.
-- **project** means an environment-local workspace record rooted at a directory.
-- **thread** means the durable conversation and work history for a project.
-- **turn** means one user-to-agent cycle, including follow-up work such as checkpointing.
-- **T3 home** means the base data directory. Runtime state normally lives below its userdata directory.
+### 2.2 Where code lives
 
-## The three ways to hurt yourself
+- `apps/server` — Effect runtime: CLI (`bin.ts`), HTTP/WS (`http.ts`, `ws.ts`), orchestration (pure `decider.ts` + `projector.ts`), SQLite persistence (event store + projections, 40 migrations), provider layer (`provider/Drivers/FreebuffDriver.ts`, `Services/FreebuffAdapter.ts`, `Services/FreebuffSession.ts`), checkpointing (git hidden refs), terminals (node-pty).
+- `apps/web` — React 19 + Vite + TanStack Router + Zustand + Tailwind v4, M3 Expressive design tokens.
+- `packages/contracts` — Effect Schema contracts; wire truth for everything crossing WS.
+- `packages/shared`, `packages/client-runtime` — shared runtime utils and client code.
+- `.repos/` — vendored **read-only reference repos** (`freebuff/` = CodebuffAI/freebuff, the protocol source of truth; `effect-smol/` — read `.repos/effect-smol/LLMS.md` before writing Effect). Never edit or import from them; sync with `vpr sync:repos`.
+- `docs/` — user/internals/operations split; new vocabulary lands in the glossary.
+- `scripts/` — dev-runner (ports derive from worktree path), migrations, icon export.
 
-1. **Killing by pattern.** Never `pkill -f`, `pgrep | kill`, or `kill` a PID you found by matching a name, path, or worktree string. Your own agent process has this worktree's path in its argv, and this machine runs several other dev servers at once. Kill only a PID you captured at spawn, or the owner of your port from `ss -H -ltnp` after confirming `/proc/<pid>/cwd` is your worktree.
-2. **Writing to the live install.** `~/.t3/userdata` is the developer's real T3 Code database, in use while you work. Reading it and copying from it are fine, and a good way to get real test data (see Test data). Never start a server against it, never open it read-write, never clean it up.
-3. **Baking in origins.** Never set `VITE_HTTP_URL` or `VITE_WS_URL` for dev. Dev is single-origin and Vite proxies `/api`, `/ws`, `/oauth`, and `/.well-known`. Setting them bakes localhost into the bundle and silently breaks every remote browser.
+### 2.3 Dev servers
 
-## Hit every surface
+- `pnpm dev` (or `npx pnpm@11.10.0 dev`) starts server + web. Worktree state defaults to that worktree's gitignored `.t3/`.
+- Ports print from `[dev-runner]` in output; server API answers on `127.0.0.1:13773` (base), web on `localhost:5733` (base) — **offsets shift when ports are taken; trust the log, not memory.**
+- Pairing: hand over the full pairing URL **with token**, never the bare origin. Fresh token: `node apps/server/src/bin.ts pair`.
+- Stop what you started, by the PID you captured. See rule 2.1.1.
 
-The most common defect in this repo is a change that works on the path you tested and is missing everywhere else. Before calling frontend work done, walk this list and say which entries applied:
+### 2.4 Test data
 
-- **Entry points.** A behavior reachable from the chat view is usually also reachable from Settings, the command palette, and a keybinding. Fixing one is not fixing the feature.
-- **Clients.** Web, desktop (wraps web, adds Electron shell/IPC), and mobile (React Native, separate navigation). Shared logic lives in `packages/client-runtime`
-- **Providers.** Codex, Claude, Cursor, Grok, and OpenCode each have an adapter. Provider-shaped features need a decision per adapter, even if the decision is "not supported here".
-- **Contracts.** Anything crossing the wire is typed in `packages/contracts`. Change the schema and the server, web, mobile, and desktop all follow.
-- **Reverse states.** If you added a way in, add the way out and the way to see it. Snooze needs unsnooze. Close needs reopen. A one-way door is a bug.
-- **Connection modes.** Local, remote/relay, and tunnel behave differently. Multi-device and multi-environment cases are real.
-- **Docs.** `docs/` splits by audience. Behavior changes that a user would notice belong in `docs/user/` (shipped-product voice, no repo tooling or source paths); architecture and contributor changes in `docs/internals/`; runbooks in `docs/operations/`; new vocabulary in `docs/internals/glossary.md`.
+An empty database is a bad test. Seed your worktree `.t3` by copying from `~/.t3/userdata` or `~/.t3/dev` with `VACUUM INTO` (see `docs/` upstream guides); bring `secrets`/`settings.json` only if the flow needs them. Copy in, never symlink, never back out.
 
-## Dev servers
+### 2.5 Verifying
 
-- `vp i` installs. Worktrees get this from the t3.json setup script; if module resolution looks broken, it probably did not run.
-- `vp run dev` starts server and web. In a worktree, state defaults to that worktree's gitignored `.t3`, which deliberately outranks an ambient `T3CODE_HOME` so you cannot land on shared state by accident. An explicit `--home-dir` still wins.
-- Ports derive from the worktree path and are stable across restarts, but read the real ones from the `[dev-runner]` line since occupied ports shift.
-- Sharing over the tailnet is three steps: run `vp run dev --share` in the background, wait for the `pairingUrl:` line in its output, paste that full URL (token included) in your reply. Do not wire up `tailscale serve` by hand for this, and do not open the URL yourself.
-- The web app requires pairing. Hand over the pairing URL, not the bare origin. A URL without its token is useless to whoever you gave it to. If the token got consumed, mint a fresh one with `node apps/server/src/bin.ts pair` — note it carries standard scopes, while the startup URL carries admin scopes (needed for Settings → Connections management).
-- Stop what you started, by the PID you tracked. See rule 1.
+- Smallest proof: `vp test run <files>` for touched tests; targeted typecheck + lint for changed scope; paste real output.
+- **No repo-wide `vp check` / `vp run -r test` by hand** — CI owns the full suite.
+- Server flows emit typed receipts (`RuntimeReceiptBus`) — tests wait on receipts and worker drains, **never on sleeps/polling**; a test needing a timeout to pass is wrong.
+- Effect code: read `.repos/effect-smol/LLMS.md` first. Complexity belongs at adapter boundaries; orchestration stays pure; UI stays dumb.
+- Never launch your own dev server if one is running for the session; reuse it or ask.
 
-## Test data
+### 2.6 Freebuff protocol (the fork's crown jewels)
 
-An empty database is a bad test. Seed your worktree's `.t3` with a copy of real data instead of pointing at live state:
+- Free mode requires **three gates**: canonical prompt opening, allowlisted agent+model pairing, active session instance id in `codebuff_metadata`.
+- Session admission is **header-driven** (`x-freebuff-model`, `x-freebuff-wallet-spend-limit`); the dedicated route is `POST /api/v1/freebuff/session/admission`.
+- Gate rejections are **(error-code, HTTP-status) pairs** — never classify by one half alone.
+- Wire truth lives in `.repos/freebuff/common/src/types/freebuff-session.ts`. When upstream and our implementation disagree, upstream wins until a graph update says otherwise.
+- `docs/KNOWLEDGE_GRAPH.md` is the living map — **every task updates it or the task is incomplete.**
 
-- Copy from `~/.t3/userdata` (the developer's real data, the most realistic test set) or `~/.t3/dev`. Worktree state lives at `<worktree>/.t3/userdata`.
-- Snapshot the database with `VACUUM INTO`, which is safe even while a server has the source open and yields one consistent file:
+---
 
-  ```bash
-  mkdir -p .t3/userdata
-  rm -f .t3/userdata/state.sqlite*  # VACUUM INTO refuses to overwrite
-  bun -e "new (require('bun:sqlite').Database)(process.env.HOME + '/.t3/userdata/state.sqlite', { readonly: true }).run(\"VACUUM INTO '.t3/userdata/state.sqlite'\")"
-  ```
+## Part 3 — Taste (non-negotiables)
 
-  A plain `cp` is only safe when no server has the source open, and must bring the `-wal` and `-shm` siblings along. A live file copy is a corrupt copy.
+- Performance without compromise: no continuously repainting animations; watch websocket payload sizes; users notice a dropped frame and a lying spinner.
+- Hit every surface: command palette + keybindings + settings paths for anything reachable from chat; reverse states (snooze/unsnooze, close/reopen) or it's a bug.
+- Inferred types over annotations; `any` is the enemy; no hardcoded secrets; no silent errors.
+- Comments explain how a thing is used and move with the code.
+- Docs split by audience (`user/` shipped-product voice, `internals/` contributors, `operations/` runbooks); behavior changes a user notices land in `docs/user/`.
+- Security matters without over-indexing on dev-mode internals.
+- If a rule here fights the task in front of you, say so loudly and get human sign-off before breaking it.
 
-- Bring `secrets` and `settings.json` only if the flow under test needs them.
-- Copy in, never symlink. Data flows one way: into your sandbox, never back out.
+## Part 4 — PR/issue conventions summary
 
-## Verifying
-
-- Smallest proof that the change works. `vp test run <files>` for the tests you touched, targeted lint and typecheck for the scope you changed.
-- **Do not run repo-wide checks.** No `vp check`, no `vp run -r test`, no `vp run -r typecheck` unless I ask. CI owns the full suite.
-- Backend behavior changes ship with focused tests for that behavior.
-- The server is event-sourced and its async flows emit typed receipts. Wait on receipts and worker drains, never on sleeps or polling. A test that needs a timeout to pass is wrong.
-- Upon request, user-visible frontend changes should get one integrated pass in a real client: `test-t3-app` for web, `test-t3-mobile` for mobile. The primary agent does this once after integrating. Subagents do not launch their own dev servers. Ask permission before doing computer use or spinning up browsers.
-
-## Pull requests
-
-- Never make a PR unless the developer explicitly asks you to do so.
-- Conventional commit titles, plain language: `fix(web): new threads no longer spike CPU`.
-- Body: the problem in a sentence or two, then how you fixed it. End with the model and harness that did the work.
-- UI changes need before/after images. Motion or timing needs a short video.
-- One concern per PR. If the description says "also", split it.
-- When babysitting: poll checks and comments newer than the last push, verify each bot finding against the source, fix real ones, dismiss false positives with a written reason. Stay quiet when nothing is new. Stop when the bots are green on the latest commit.
-
-## How it works
-
-Clients send typed WebSocket requests. The server turns them into _commands_, a pure _decider_ turns commands into persisted _events_, and a _projector_ derives the read model the UI renders. Provider CLIs run as subprocesses; per-provider _adapters_ translate their native protocols into orchestration events. Side effects run in queue-backed _reactors_ that emit _receipts_ when milestones land. Each turn ends with a _checkpoint_, a hidden git ref, so the app can diff and restore.
-
-Full glossary with file links: `docs/internals/glossary.md`
-
-## Where code lives
-
-- `apps/server` - WebSocket, orchestration, providers, checkpointing. Effect-heavy: read `.repos/effect-smol/LLMS.md` before writing Effect code.
-- `apps/web` - React/Vite UI. `apps/desktop` wraps it, `apps/mobile` is React Native, `apps/marketing` is the site.
-- `packages/contracts` - Effect/Schema contracts plus small derived helpers. No heavy runtime logic.
-- `packages/shared` - shared runtime utils, subpath exports, no barrel.
-- `packages/client-runtime` - client code shared by web and mobile.
-- `.repos/` - vendored read-only references. Prefer their patterns over invented ones. Never edit or import from them. Sync with `vpr sync:repos` when bumping the matching dependency.
-
-## Taste
-
-- Complexity belongs at the adapter boundary. Orchestration stays pure, UI stays dumb.
-- Inferred types over annotations. `any` is the enemy.
-- Comments describe how a thing is used, and move when the code moves. To be used mostly to describe functions, not to annotate every line of behavior.
-- Our users drive agents all day and notice a dropped frame, a lying spinner, and a stale label. No continuously repainting animations; they peg the GPU on high-refresh displays.
-- If a rule here fights the task in front of you, say so loudly and get a human sign-off before breaking it.
-
-## Additional tips
-
-- Don't verify with browsers or computer use unless the user explicitly agrees or requests it.
-- Security is important, but should not be over-indexed on, especially for dev mode/maintainer-only features.
+- Conventional commits only; subjects ≤ 6 words after type; imperative body.
+- Every commit co-authored by **the-ai-developer only** (trailer in 1.2.6).
+- Merge strategy: **merge commit**; squash/rebase prohibited.
+- Reviewer of record: **the-ai-developer** on every PR.
+- Issues are the unit of work; PRs reference exactly one issue; research lands in the issue, evidence lands in the PR.

@@ -1,0 +1,109 @@
+name: Agentic review
+
+# Factory pattern (mirrors the OpenAI agentic loop):
+# CI gates the diff -> parallel specialist review -> risk classification ->
+# human/Reviewer-of-record approval before merge.
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize, labeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: agentic-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  classify:
+    name: Triage + size
+    runs-on: ubuntu-latest
+    outputs:
+      size: ${{ steps.size.outputs.size }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: size
+        run: |
+          n=$(git diff --numstat "origin/${{ github.base_ref }}...HEAD" | awk '{a+=$1; d+=$2} END {print a+d}')
+          if [ "$n" -le 50 ]; then s="S"; elif [ "$n" -le 400 ]; then s="M"; else s="L"; fi
+          echo "size=$s" >> "$GITHUB_OUTPUT"
+      - name: Label PR
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: |
+            size/${{ steps.size.outputs.size }}
+
+  charter-guard:
+    name: Charter guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Co-author trailer present on every commit
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          commits=$(git log --format='%H' --no-merges "$base..$head")
+          [ -n "$commits" ] || { echo "no commits"; exit 1; }
+          for c in $commits; do
+            git log -1 --format=%B "$c" | grep -qi "^Co-Authored-By: the-ai-developer <" \
+              || { echo "::error::commit $c is missing the required co-author line (the-ai-developer)"; exit 1; }
+            # exactly one co-author: no other accounts allowed
+            git log -1 --format=%B "$c" | grep -i "^Co-Authored-By:" | grep -viq "^Co-Authored-By: the-ai-developer" \
+              && { echo "::error::commit $c has a co-author other than the-ai-developer"; exit 1; }
+          done
+      - name: No generated-with footers
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          ! git log --format='%B' "$base..$head" | grep -qi "generated with"
+      - name: Conventional subject, max six words
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          bad=0
+          while read -r subj; do
+            echo "subject: $subj"
+            echo "$subj" | grep -qE '^(feat|fix|refactor|docs|test|chore|perf|ci|build|style|revert)(\([^)]*\))?: ' || { echo "::error::non-conventional subject: $subj"; bad=1; }
+            words=$(echo "$subj" | sed -E 's/^[a-z]+(\([^)]*\))?: //' | wc -w)
+            [ "$words" -le 6 ] || { echo "::error::subject exceeds 6 words: $subj"; bad=1; }
+          done < <(git log --format='%s' --no-merges "$base..$head")
+          exit $bad
+
+  specialist-review:
+    name: Specialist review notice
+    runs-on: ubuntu-latest
+    needs: [classify]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Post review checklist
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const size = '${{ needs.classify.outputs.size }}';
+            const body = [
+              `**Agentic review triage** — size \`${size}\``,
+              '',
+              'Specialist checklist (Reviewer of record: @the-ai-developer):',
+              '- [ ] Correctness: failure modes, races, boundary validation',
+              '- [ ] Tests: focused, receipt-based waits, would fail without change',
+              '- [ ] Surfaces: entry points, clients, reverse states, docs',
+              '- [ ] Performance: payload sizes, render loops, projection queries',
+              '- [ ] Security: credentials, fetch, subprocess surfaces',
+              '- [ ] Graph: `docs/KNOWLEDGE_GRAPH.md` updated',
+              '',
+              'Findings land as review comments; blockers cite charter rules.',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });

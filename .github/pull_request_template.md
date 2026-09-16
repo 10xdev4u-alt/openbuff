@@ -1,33 +1,37 @@
 <!--
-⚠️ READ BEFORE OPENING ⚠️
-
-We are not actively accepting contributions right now.
-
-You can still open a PR, but please do so knowing there is a high chance
-we may close it without merging it, or never review it.
-
-- Small, focused PRs are strongly preferred. Bug fixes are most likely to be merged.
-- New features will most likely just annoy us.
-- 1,000+ line PRs with a bunch of new features will probably get you banned from the repo.
+PR title: conventional type + <=6-word subject.
+One PR = one concern = one issue. Reviewer of record: the-ai-developer.
 -->
 
-## What Changed
+## Issue
+Closes #
 
-<!-- Describe the change clearly and keep scope tight. -->
+## Research
+Evidence gathered before implementation (code refs, upstream refs in `.repos/`, measurements):
 
-## Why
+## Evaluation
+Multi-POV outcome (architect / hacker / maintainer / user / operator / future-self) — tradeoffs and the pick:
 
-<!-- Explain the problem being solved and why this approach is the right one. -->
+## Approach
+Why this is the smallest correct fix:
 
-## UI Changes
+## Local proof
+<!-- Paste real output. No "should work". -->
+```
+<command + output>
+```
 
-<!-- If this PR changes UI, include clear before/after screenshots.
-     If the change involves motion or interaction, include a short video.
-     Delete this section if not applicable. -->
+## Risk & rollback
+What could fail, how to revert:
 
-## Checklist
+## Surfaces touched
+- [ ] Entry points (chat / settings / palette / keybindings)
+- [ ] Clients (web / desktop wrapper / mobile)
+- [ ] Reverse states (undo / reopen / unsnooze)
+- [ ] Contracts (`packages/contracts`) if wire changes
+- [ ] Docs (`user/` / `internals/` / `operations/`)
+- [ ] Knowledge graph (`docs/KNOWLEDGE_GRAPH.md`)
 
-- [ ] This PR is small and focused
-- [ ] I explained what changed and why
-- [ ] I included before/after screenshots for any UI changes
-- [ ] I included a video for animation/interaction changes
+<!--
+Reminder: merge commit only (no squash/rebase). Reviewer: the-ai-developer.
+-->
