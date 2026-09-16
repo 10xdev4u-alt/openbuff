@@ -115,8 +115,12 @@ const getTelemetryIdentityCauseAnnotations = (cause: unknown) => {
   return { causeKind: "other" };
 };
 
-const logTelemetryIdentityError = (error: TelemetryIdentityError) =>
-  Effect.logWarning(error.message).pipe(
+const logTelemetryIdentityError = (error: TelemetryIdentityError) => {
+  // Decode failures are EXPECTED on a best-effort probe: a stale
+  // `~/.codex/auth.json` from another tool must not make a clean boot look
+  // broken (issue #30). Unexpected read failures keep warning level.
+  const log = error._tag === "TelemetryIdentityDecodeError" ? Effect.logDebug : Effect.logWarning;
+  return log(error.message).pipe(
     Effect.annotateLogs({
       errorTag: error._tag,
       source: error.source,
@@ -125,6 +129,7 @@ const logTelemetryIdentityError = (error: TelemetryIdentityError) =>
       ...(error.stack === undefined ? {} : { errorStack: error.stack }),
     }),
   );
+};
 
 const readIdentityFile = (
   fileSystem: FileSystem.FileSystem,

@@ -14,16 +14,17 @@ import * as Identify from "./Identify.ts";
 interface CapturedLog {
   readonly message: unknown;
   readonly annotations: Readonly<Record<string, unknown>>;
+  readonly logLevel: string | undefined;
 }
-
 const sha256 = (value: string) =>
   NodeCrypto.createHash("sha256").update(value, "utf8").digest("hex");
 
 const makeCaptureLogger = (logs: CapturedLog[]) =>
-  Logger.make(({ fiber, message }) => {
+  Logger.make(({ fiber, message, logLevel }) => {
     logs.push({
       message,
       annotations: fiber.getRef(References.CurrentLogAnnotations),
+      logLevel: logLevel === undefined ? undefined : String(logLevel),
     });
   });
 
@@ -106,6 +107,9 @@ it.layer(NodeServices.layer)("telemetry identity", (it) => {
         decodeLog?.message,
         `Failed to decode codex telemetry identity at '${codexAuthPath}'.`,
       );
+      // Stale-token decode failures are EXPECTED on best-effort identity
+      // probes — debug, not warning (issue #30: silent clean boots).
+      assert.equal(decodeLog?.logLevel, "Debug");
 
       assert.equal(decodeLog?.annotations.filePath, codexAuthPath);
       assert.equal(decodeLog?.annotations.causeKind, "schema");
@@ -119,11 +123,15 @@ it.layer(NodeServices.layer)("telemetry identity", (it) => {
       assert.notInclude(annotations, privateAccessToken);
     }).pipe(
       Effect.provide(
-        Layer.merge(
+        Layer.mergeAll(
           ServerConfig.layerTest(process.cwd(), {
             prefix: "t3-telemetry-identify-decode-",
           }),
           Logger.layer([logger], { mergeWithExisting: false }),
+          // The runtime default (Info) filters Debug by design — issue #30's
+          // silence. Raise the floor here so the test can still assert the
+          // captured line IS debug-level.
+          Layer.succeed(References.MinimumLogLevel, "Debug" as const),
         ),
       ),
     );
