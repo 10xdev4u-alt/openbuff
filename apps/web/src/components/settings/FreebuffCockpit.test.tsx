@@ -18,6 +18,8 @@ function freebuffProvider(usage: ServerProvider["usage"]): ServerProvider {
     auth: { status: "authenticated" },
     checkedAt: "2026-09-16T00:00:00.000Z",
     models: [],
+    slashCommands: [],
+    skills: [],
     ...(usage !== undefined ? { usage } : {}),
   };
 }
