@@ -53,9 +53,8 @@ jobs:
           for c in $commits; do
             git log -1 --format=%B "$c" | grep -qi "^Co-Authored-By: the-ai-developer <" \
               || { echo "::error::commit $c is missing the required co-author line (the-ai-developer)"; exit 1; }
-            # exactly one co-author: no other accounts allowed
-            git log -1 --format=%B "$c" | grep -i "^Co-Authored-By:" | grep -viq "^Co-Authored-By: the-ai-developer" \
-              && { echo "::error::commit $c has a co-author other than the-ai-developer"; exit 1; }
+            other=$(git log -1 --format=%B "$c" | grep -i "^Co-Authored-By:" | grep -vic "the-ai-developer" || true)
+            [ "$other" -eq 0 ] || { echo "::error::commit $c has a co-author other than the-ai-developer"; exit 1; }
           done
       - name: No generated-with footers
         run: |
