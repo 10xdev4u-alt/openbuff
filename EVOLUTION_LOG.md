@@ -57,3 +57,19 @@ Read root manifests + README + AGENTS.md, listed `apps/`, `packages/`, `apps/ser
 **Graph nodes updated:** §5.5 added (9-row protocol audit); task log row appended.
 
 **Mistake counter:** still 1 (no repeats).
+
+## 2026-09-16 — Admission route port (#24, PRs #43/#44)
+
+**Tried:** Ported `establishFreebuffSession` to the dedicated admission route with the full upstream header contract, typed gate bodies (403/409/429 returned, not thrown), 404/405 fail-closed unsupported-server error, and `FreebuffSessionRequestError` (status + machine code + parsed retry-after). TDD with injected fetch — RED 10/10 (implementation even fired a live network probe before injection existed), GREEN 9/9, provider slice 125/125, typecheck clean.
+
+**What worked:** Injected-fetch test design (zero global mutation); validating design on the issue before coding; CI catching two real findings my local checks missed.
+
+**What failed + evidence:** (1) Local "TSC-EXIT:0" was `head`'s exit code, not tsc's — CI failed on `exactOptionalPropertyTypes` (TS2412) I never saw. (2) Same class again: `pnpm typecheck` grep swallowed the exit code, which then surfaced the real `globalDate` lint. (3) Merged #43 in a batched command without reading CodeRabbit's CHANGES_REQUESTED first — process miss, self-caught, finding fixed as #44.
+
+**Lessons (reusable rules):**
+1. After a pipe, `$?` is the LAST command's status. Propagate the real exit: `${PIPESTATUS[0]}` or run the checker bare before grepping. (Repeat of an earlier mistake — counter now 2. A third repeat means the workflow itself changes: no piped checker assertions, ever.)
+2. `exactOptionalPropertyTypes` requires `field?: T | undefined` when assigning possibly-undefined values — check tsconfig flags before writing optional-bearing APIs.
+3. This repo requires Effect `Clock` for time access; plain modules opt out via `// @effect-diagnostics globalDate:off` with rationale (convention: serviceLauncher.ts, usageAggregation.ts).
+4. Never merge in a command batch that also produces the review verdict — read reviews, then merge, as separate steps.
+
+**Graph nodes updated:** §1/§2/mermaid POST refs → admission route (PR #44); task log row appended.
