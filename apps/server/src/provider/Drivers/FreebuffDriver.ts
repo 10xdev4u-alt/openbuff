@@ -14,7 +14,14 @@
  *
  * @module provider/Drivers/FreebuffDriver
  */
-import { FreebuffSettings, ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
+import {
+  DEFAULT_FREEBUFF_FREE_MODEL,
+  FREEBUFF_FREE_MODEL_IDS,
+  FreebuffSettings,
+  ProviderDriverKind,
+  type ServerProvider,
+  type ServerProviderModel,
+} from "@t3tools/contracts";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as FileSystem from "effect/FileSystem";
@@ -33,6 +40,37 @@ import {
 } from "../ProviderDriver.ts";
 import { buildServerProvider } from "../providerSnapshot.ts";
 import { makeManualOnlyProviderMaintenanceCapabilities } from "../providerMaintenance.ts";
+
+/**
+ * Upstream display names for the free-tier allowlist (upstream
+ * `common/src/constants/freebuff-models.ts` model entries). The slug set is
+ * owned by the contracts pairing map; this only supplies what the picker renders.
+ */
+const FREEBUFF_MODEL_DISPLAY_NAME_BY_SLUG: Readonly<Record<string, string>> = {
+  "deepseek/deepseek-v4-pro": "DeepSeek V4 Pro",
+  "deepseek/deepseek-v4-flash": "DeepSeek V4.1 Flash",
+  "mimo/mimo-v2.5": "MiMo 2.5",
+  "minimax/minimax-m3": "MiniMax M3",
+  "openai/gpt-5.6-luna": "GPT-5.6 Luna",
+  "z-ai/glm-5.2": "GLM 5.2",
+  "z-ai/glm-5.3-flash": "GLM 5.3 Flash",
+  "crof/kimi-k3-eco": "Kimi K3",
+};
+
+/**
+ * The free-tier picker rows: exactly the allowlisted models, flash pinned as
+ * the tier default. Capabilities stay null (the base3 agents take no runtime
+ * options); the adapter derives the agent per selected slug.
+ */
+export function freebuffSnapshotModels(): ReadonlyArray<ServerProviderModel> {
+  return FREEBUFF_FREE_MODEL_IDS.map((slug) => ({
+    slug,
+    name: FREEBUFF_MODEL_DISPLAY_NAME_BY_SLUG[slug] ?? slug,
+    isCustom: false,
+    capabilities: null,
+    ...(slug === DEFAULT_FREEBUFF_FREE_MODEL ? { isDefault: true } : {}),
+  }));
+}
 import type { ServerProviderShape } from "../Services/ServerProvider.ts";
 import { makeFreebuffAdapter } from "../Services/FreebuffAdapter.ts";
 
@@ -159,7 +197,7 @@ export const FreebuffDriver: ProviderDriver<FreebuffSettings, FreebuffDriverEnv>
         presentation: { displayName: "Freebuff" },
         enabled: input.enabled,
         checkedAt: yield* nowIso,
-        models: [],
+        models: freebuffSnapshotModels(),
         probe: {
           installed: true,
           version: null,
