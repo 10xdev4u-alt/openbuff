@@ -63,6 +63,11 @@ import {
   ProviderAdapterValidationError,
   type ProviderAdapterError,
 } from "../Errors.ts";
+import {
+  classifyFreebuffGate,
+  freebuffGateDisposition,
+  gateUserMessage,
+} from "./FreebuffGate.ts";
 import type {
   ProviderAdapterShape,
   ProviderThreadSnapshot,
@@ -102,6 +107,12 @@ interface FreebuffSession {
    * backend answers `waiting_room_required`.
    */
   freebuffInstanceId: string | undefined;
+  /**
+   * Set when a session gate rejection ended the seat (`ended`) or another
+   * client took it (`superseded`). `ended` clears on the next user-initiated
+   * turn (which re-admits); `superseded` is terminal for this adapter.
+   */
+  gateState: "ended" | "superseded" | undefined;
 }
 
 /** SDK tool name → canonical item type (see TOOL_LIFECYCLE_ITEM_TYPES). */
@@ -266,6 +277,7 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
           pendingApprovals: new Map(),
           autoApproveCommands: false,
           freebuffInstanceId: undefined,
+          gateState: undefined,
         });
         return session;
       });
@@ -297,6 +309,29 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
             operation: "sendTurn",
             issue: `Thread ${String(input.threadId)} already has an active turn.`,
           });
+        }
+
+        // A superseded seat is terminal: another client owns the account's
+        // session; fighting it would make the two clients take turns killing
+        // each other's sessions.
+        if (state.gateState === "superseded") {
+          return yield* Effect.fail(
+            new ProviderAdapterRequestError({
+              provider: "freebuff",
+              method: "sendTurn",
+              detail:
+                "Another OpenBuff session took over this account. Close the other session, then reload here.",
+            }),
+          );
+        }
+        // Session gates end the seat but not the thread: the next
+        // user-initiated turn re-admits (fresh admission below) instead of a
+        // background retry loop, which upstream measurements tied to burned
+        // admissions.
+        if (state.gateState === "ended") {
+          state.gateState = undefined;
+          state.freebuffInstanceId = undefined;
+          state.runState = undefined;
         }
 
         const turnId = TurnId.make(`freebuff-turn-${newUuid()}`);
@@ -545,6 +580,16 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
                 const aborted =
                   abort.signal.aborted ||
                   (cause instanceof Error && cause.name === "AbortError");
+                // Session gate rejections carry an (error code, status) pair
+                // on the thrown error; classify before any generic handling.
+                const gateCode = classifyFreebuffGate(cause);
+                const disposition =
+                  gateCode !== null ? freebuffGateDisposition(gateCode) : undefined;
+                if (gateCode !== null) {
+                  if (disposition === "ended" || disposition === "superseded") {
+                    state.gateState = disposition;
+                  }
+                }
                 // The backend returns 402 "Out of credits" when a paid model is
                 // requested on a free/limited account. Surface a clear,
                 // actionable message instead of the raw SDK error text.
@@ -555,9 +600,10 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
                   (cause instanceof Error &&
                     "statusCode" in cause &&
                     (cause as { statusCode?: number }).statusCode === 402);
+                const gateMessage = gateUserMessage(gateCode);
                 const errorMessage = isOutOfCredits
                   ? "This model requires credits your account doesn't have. Free-tier accounts are limited to the models Freebuff assigns (currently DeepSeek V4 Flash). Switch back to the default model, or add credits at codebuff.com/usage."
-                  : causeText;
+                  : (gateMessage ?? causeText);
                 const failureEffect = aborted
                   ? emit({
                       ...baseEvent(threadId, turnId),
@@ -576,8 +622,15 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
                   state.activeTurn = undefined;
                   state.session = {
                     ...state.session,
-                    status: "ready",
+                    // Seat-ending and takeover gates leave the session visibly
+                    // broken until the next turn re-admits (or the client
+                    // reloads, for a takeover).
+                    status:
+                      disposition === "ended" || disposition === "superseded"
+                        ? ("error" as const)
+                        : ("ready" as const),
                     updatedAt: nowIso(),
+                    ...(gateMessage !== undefined ? { lastError: gateMessage } : {}),
                   };
                 }).pipe(Effect.andThen(failureEffect));
               },
