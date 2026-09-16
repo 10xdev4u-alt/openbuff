@@ -1,9 +1,13 @@
 import {
   CommandId,
   DEFAULT_MODEL,
+  DEFAULT_MODEL_BY_PROVIDER,
+  DEFAULT_SERVER_SETTINGS,
   DEFAULT_PROVIDER_INTERACTION_MODE,
   type ModelSelection,
   ProjectId,
+  ProviderDriverKind,
+  type ServerSettings as ContractsServerSettings,
   ProviderInstanceId,
   ThreadId,
 } from "@t3tools/contracts";
@@ -163,10 +167,26 @@ export const launchStartupHeartbeat = recordStartupHeartbeat.pipe(
   Effect.asVoid,
 );
 
-export const getAutoBootstrapDefaultModelSelection = (): ModelSelection => ({
-  instanceId: ProviderInstanceId.make("codex"),
-  model: DEFAULT_MODEL,
-});
+export const getAutoBootstrapDefaultModelSelection = (
+  settings: ContractsServerSettings = DEFAULT_SERVER_SETTINGS,
+): ModelSelection => {
+  const enabledEntry = Object.entries(settings.providers).find(
+    ([, provider]) => provider.enabled,
+  );
+  const driver = enabledEntry
+    ? ProviderDriverKind.make(enabledEntry[0])
+    : undefined;
+  if (driver === undefined) {
+    return {
+      instanceId: ProviderInstanceId.make("codex"),
+      model: DEFAULT_MODEL,
+    };
+  }
+  return {
+    instanceId: ProviderInstanceId.make(driver),
+    model: DEFAULT_MODEL_BY_PROVIDER[driver] ?? DEFAULT_MODEL,
+  };
+};
 
 export const resolveWelcomeBase = Effect.gen(function* () {
   const serverConfig = yield* ServerConfig.ServerConfig;
@@ -192,6 +212,8 @@ export const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
 
   if (serverConfig.autoBootstrapProjectFromCwd) {
     yield* Effect.gen(function* () {
+      const settingsService = yield* ServerSettings.ServerSettingsService;
+      const liveSettings = yield* settingsService.getSettings;
       const existingProject = yield* projectionReadModelQuery.getActiveProjectByWorkspaceRoot(
         serverConfig.cwd,
       );
@@ -202,7 +224,7 @@ export const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
         const createdAt = DateTime.formatIso(yield* DateTime.now);
         nextProjectId = ProjectId.make(yield* randomUUID);
         const bootstrapProjectTitle = path.basename(serverConfig.cwd) || "project";
-        nextProjectDefaultModelSelection = getAutoBootstrapDefaultModelSelection();
+        nextProjectDefaultModelSelection = getAutoBootstrapDefaultModelSelection(liveSettings);
         yield* orchestrationEngine.dispatch({
           type: "project.create",
           commandId: CommandId.make(yield* randomUUID),
@@ -215,7 +237,7 @@ export const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
       } else {
         nextProjectId = existingProject.value.id;
         nextProjectDefaultModelSelection =
-          existingProject.value.defaultModelSelection ?? getAutoBootstrapDefaultModelSelection();
+          existingProject.value.defaultModelSelection ?? getAutoBootstrapDefaultModelSelection(liveSettings);
       }
 
       const existingThreadId =
