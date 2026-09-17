@@ -41,6 +41,27 @@ it("treats stable installs as direct invocations", () => {
   assert.isNull(detectCliRunner(""));
 });
 
+it("detects runners by cache layout, not package name", () => {
+  // The fork's package is `openbuff`; upstream `t3` layouts must keep working
+  // so a stale npx cache does not silently change the suggested command.
+  assert.equal(
+    detectCliRunner("/home/theo/.npm/_npx/abc123/node_modules/openbuff/dist/bin.mjs"),
+    "npx",
+  );
+  assert.equal(
+    detectCliRunner("/home/theo/.cache/pnpm/dlx/abc/node_modules/openbuff/dist/bin.mjs"),
+    "pnpm dlx",
+  );
+  assert.equal(
+    detectCliRunner("/home/theo/.bun/install/cache/openbuff@0.0.31/dist/bin.mjs"),
+    "bunx",
+  );
+  assert.equal(
+    detectCliRunner("/tmp/bunx-1000-openbuff@latest/node_modules/openbuff/dist/bin.mjs"),
+    "bunx",
+  );
+});
+
 it("re-suggests the nightly channel only for nightly builds", () => {
   assert.equal(suggestedPackageSpec("0.0.31-nightly.20260729"), "openbuff@nightly");
   assert.equal(suggestedPackageSpec("0.0.31"), "openbuff");

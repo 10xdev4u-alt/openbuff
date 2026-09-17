@@ -18,10 +18,15 @@ const successfulRunner = (fs: FileSystem.FileSystem, path: Path.Path) =>
   ProcessRunner.ProcessRunner.of({
     run: (input) =>
       Effect.gen(function* () {
+        // The install target is part of the contract: the spec is the final
+        // arg and must pin this fork's package, never upstream `t3` (#64).
+        if (!input.args.at(-1)?.startsWith("openbuff@")) {
+          return yield* Effect.die(`unexpected install spec: ${String(input.args.at(-1))}`);
+        }
         const prefixIndex = input.args.indexOf("--prefix");
         const stagingDir = input.args[prefixIndex + 1];
         if (stagingDir === undefined) return yield* Effect.die("missing npm --prefix");
-        const entry = path.join(stagingDir, "node_modules", "t3", "dist", "bin.mjs");
+        const entry = path.join(stagingDir, "node_modules", "openbuff", "dist", "bin.mjs");
         yield* fs.makeDirectory(path.dirname(entry), { recursive: true }).pipe(Effect.orDie);
         yield* fs.writeFileString(entry, "export {};\n").pipe(Effect.orDie);
         return {
@@ -42,7 +47,9 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-pinned-runtime-test-" });
+      const baseDir = yield* fs.makeTempDirectoryScoped({
+        prefix: "openbuff-pinned-runtime-test-",
+      });
       const finalPaths = pinnedRuntimePaths(path, baseDir, "1.2.3");
       let validatedDirectory = "";
 
@@ -71,7 +78,9 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-pinned-runtime-test-" });
+      const baseDir = yield* fs.makeTempDirectoryScoped({
+        prefix: "openbuff-pinned-runtime-test-",
+      });
       const finalPaths = pinnedRuntimePaths(path, baseDir, "1.2.3");
 
       yield* ensurePinnedRuntimeInstalled({
