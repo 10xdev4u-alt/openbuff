@@ -1,6 +1,6 @@
 # Workspace layout
 
-> For maintainers. Upstream T3 Code user docs live in [docs/user](../user/).
+> For maintainers. User-facing docs live in [docs/user](../user/).
 
 A pnpm workspace driven by [vite-plus](https://vite.plus) (`vp`). See [scripts.md](./scripts.md) for
 the task commands.

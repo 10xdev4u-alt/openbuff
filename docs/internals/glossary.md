@@ -118,7 +118,7 @@ A point-in-time view of state. The word is used in multiple layers, including or
 
 ### Checkpointing
 
-Checkpointing captures workspace state over time so the app can diff turns and restore earlier points. The main pieces are [CheckpointStore.ts][19], [CheckpointDiffQuery.ts][20], and [CheckpointReactor.ts][6].
+Checkpointing captures workspace state over time so the app can diff turns and restore earlier points. The main pieces are [CheckpointStore.ts][19], [CheckpointDiffQuery.ts][25], and [CheckpointReactor.ts][6].
 
 #### Checkpoint
 
@@ -134,11 +134,11 @@ The starting checkpoint for diffing a thread timeline. This flow is surfaced thr
 
 #### Checkpoint diff
 
-The patch difference between two checkpoints. Query logic lives in [CheckpointDiffQuery.ts][20], diff parsing lives in [Diffs.ts][23], and finalization is coordinated by [CheckpointReactor.ts][6].
+The patch difference between two checkpoints. Query logic lives in [CheckpointDiffQuery.ts][25], diff parsing lives in [Diffs.ts][23], and finalization is coordinated by [CheckpointReactor.ts][6].
 
 #### Turn diff
 
-The file patch and changed-file summary for one turn. It is usually computed in [CheckpointDiffQuery.ts][20], represented in [the contracts][1], and recorded into thread state by [projector.ts][4].
+The file patch and changed-file summary for one turn. It is usually computed in [CheckpointDiffQuery.ts][25], represented in [the contracts][1], and recorded into thread state by [projector.ts][4].
 
 ## Practical Shortcuts
 
@@ -175,8 +175,8 @@ The file patch and changed-file summary for one turn. It is usually computed in 
 [18]: ../user/permission-modes.md
 [19]: ../../apps/server/src/checkpointing/CheckpointStore.ts
 [20]: ../../apps/server/src/provider/Services/FreebuffAdapter.ts
-[20]: ../../apps/server/src/checkpointing/CheckpointDiffQuery.ts
 [21]: ../../apps/server/src/persistence/Services/ProjectionCheckpoints.ts
 [22]: ../../apps/server/src/checkpointing/Utils.ts
 [23]: ../../apps/server/src/checkpointing/Diffs.ts
 [24]: ./overview.md
+[25]: ../../apps/server/src/checkpointing/CheckpointDiffQuery.ts

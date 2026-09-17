@@ -7,7 +7,7 @@ client that talks to it over one authenticated Effect RPC WebSocket. The server 
 execution boundary: every provider turn, terminal, git operation, and filesystem read happens
 there, never in the client.
 
-```
+```text
 ┌────────────────────────────────────────────────┐
 │ Client: apps/web                               │
 │ shared runtime: packages/client-runtime        │

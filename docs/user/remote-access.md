@@ -1,6 +1,6 @@
 # Remote Access
 
-Use this when you want to connect to a OpenBuff server from another device, such as a phone or
+Use this when you want to connect to an OpenBuff server from another device, such as a phone or
 another machine's browser.
 
 ## Quick Pairing for a Running Server

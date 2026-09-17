@@ -6,7 +6,7 @@
 pushes to `main`:
 
 - **Build**: workspace build plus the web bundle artifacts.
-- **Typecheck**: `vpr typecheck` for the workspace type check.
+- **Typecheck**: `vp run typecheck` for the workspace type check.
 - **Test**: `vp run test` across the workspace.
 
 Other workflows run on pull requests: a charter guard (commit and PR conventions), PR triage and

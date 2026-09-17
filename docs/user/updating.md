@@ -22,10 +22,10 @@ The update does not remove saved threads, settings, or project files.
 
 ## Choose the Action You See
 
-| Action                     | What to do                                                                                                                                                                  |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Update server**          | Available for the OpenBuff Linux background service. Select the button and leave OpenBuff open while it prepares, tests, restarts, and reconnects.                            |
-| **Copy update command**    | Copy the command, open a terminal on the server machine, stop the current OpenBuff server, and relaunch it with the copied command and any startup options you normally use. |
+| Action                  | What to do                                                                                                                                                                   |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Update server**       | Available for the OpenBuff Linux background service. Select the button and leave OpenBuff open while it prepares, tests, restarts, and reconnects.                           |
+| **Copy update command** | Copy the command, open a terminal on the server machine, stop the current OpenBuff server, and relaunch it with the copied command and any startup options you normally use. |
 
 The available action depends on how that server was started. OpenBuff does not update connected
 servers silently in the background.

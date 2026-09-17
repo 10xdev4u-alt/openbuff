@@ -1,13 +1,12 @@
 # Resource telemetry architecture
 
-> For maintainers. Upstream T3 Code user docs live in [docs/user](../user/).
+> For maintainers. User-facing docs live in [docs/user](../user/).
 
 > **Fork note:** this document describes the upstream architecture. Everything server-side is real
 > here (`native/resource-monitor`, `apps/server/src/resourceTelemetry`,
 > `packages/contracts/src/resourceTelemetry.ts`). The Electron publisher side is upstream-only —
 > this fork ships web + server, so nothing feeds fd 4 and host-power fields degrade to `unknown`.
-
-Status: implemented
+> Status: implemented
 
 ## Purpose
 

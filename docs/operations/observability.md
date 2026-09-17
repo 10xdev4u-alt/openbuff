@@ -1,6 +1,6 @@
 # Observability
 
-> For maintainers. Upstream T3 Code user docs live in [docs/user](../user/).
+> For maintainers. User-facing docs live in [docs/user](../user/).
 
 OpenBuff has one server-side observability model:
 
@@ -8,9 +8,9 @@ OpenBuff has one server-side observability model:
 - completed spans go to a local NDJSON trace file
 - traces and metrics can also be exported over OTLP to a real backend like Grafana LGTM
 
-The local trace file is the persisted source of truth for normal local launches. Those launches do not
-write a separate server log file, but they do persist `server.log` alongside the trace file under the
-same logs directory.
+The local trace file is the persisted source of truth for normal local launches, which write no
+separate server log. The config still derives a `server.log` path for launcher-managed and other
+special runs, but normal local launches persist only stdout plus the trace file.
 
 ## Where To Find Things
 
@@ -21,7 +21,7 @@ Logs are human-facing:
 - destination: stdout
 - format: `Logger.consolePretty()`
 - normal local persistence: none
-- headless/launcher runs also write `server.log` next to the trace file
+- launcher-managed runs persist a captured `server.log` next to the trace file
 
 If you want a log message to show up in the trace file, emit it inside an active span with `Effect.log...`. `Logger.tracerLogger` will attach it as a span event.
 
@@ -154,12 +154,16 @@ state under the base directory's `userdata` folder:
 TRACE_FILE="${T3CODE_HOME:-$HOME/.openbuff}/userdata/logs/server.trace.ndjson"
 ```
 
-A dev run stores under the dev home resolved by the dev runner instead. Check the
-`T3CODE_HOME` the runner exports, or find the live server's state with:
+A dev run the runner launched with an explicit base (`--home-dir`, a worktree home, or an ambient
+`T3CODE_HOME`) stores under that base's `userdata` folder:
 
 ```bash
-TRACE_FILE="$T3CODE_HOME/dev/logs/server.trace.ndjson"
+TRACE_FILE="$T3CODE_HOME/userdata/logs/server.trace.ndjson"
 ```
+
+Only when the base directory is left unset does the server itself derive a `dev` state folder
+(`<base>/dev/logs/server.trace.ndjson`) — check the `baseDir=` line the dev runner prints at
+startup to see which case you are in.
 
 Tail the selected file:
 

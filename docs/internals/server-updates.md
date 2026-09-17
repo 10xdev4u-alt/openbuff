@@ -1,6 +1,6 @@
 # Server Update Architecture
 
-> For maintainers. Upstream T3 Code user docs live in [docs/user](../user/).
+> For maintainers. User-facing docs live in [docs/user](../user/).
 
 Remote server updates use one stable systemd launcher. Foreground CLI processes do not self-update,
 and a running server never edits its systemd unit or durable service state.

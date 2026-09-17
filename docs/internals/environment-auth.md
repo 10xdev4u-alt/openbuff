@@ -1,6 +1,6 @@
 # Environment Authentication Profile
 
-> For maintainers. Upstream T3 Code user docs live in [docs/user](../user/).
+> For maintainers. User-facing docs live in [docs/user](../user/).
 
 The environment server and the relay use separate credentials, issuers, and trust
 boundaries. They intentionally use a similar OAuth-shaped model so that permission

@@ -1,6 +1,6 @@
 # Remote Architecture
 
-> For maintainers. Upstream T3 Code user docs live in [docs/user](../user/).
+> For maintainers. User-facing docs live in [docs/user](../user/).
 
 Remote environments are shipped, not planned. Direct, relay-tunneled, and Tailscale access all exist
 today. This document describes the model they share and where each piece lives. For the
@@ -49,12 +49,12 @@ control plane or a copy of session state.
 
 [`connection/model.ts`][model] defines four target tags, which are the real access taxonomy:
 
-| Target                    | Used for                                                                 |
-| ------------------------- | ------------------------------------------------------------------------ |
-| `PrimaryConnectionTarget` | The platform-managed local server (CLI-served web app).                |
-| `BearerConnectionTarget`  | Any manually paired endpoint reached over direct HTTP/WebSocket.         |
-| `RelayConnectionTarget`   | Managed relay tunnels (brokered outside this repo).                       |
-| `SshConnectionTarget`     | SSH environments (upstream; unwired here).                                |
+| Target                    | Used for                                                         |
+| ------------------------- | ---------------------------------------------------------------- |
+| `PrimaryConnectionTarget` | The platform-managed local server (CLI-served web app).          |
+| `BearerConnectionTarget`  | Any manually paired endpoint reached over direct HTTP/WebSocket. |
+| `RelayConnectionTarget`   | Managed relay tunnels (brokered outside this repo).              |
+| `SshConnectionTarget`     | SSH environments (upstream; unwired here).                       |
 
 Bearer, relay, and SSH are persisted; primary is platform-managed. Note that Tailscale is not a
 separate target kind. A Tailscale URL is paired through the ordinary bearer path in
@@ -163,7 +163,7 @@ bearer path.
 `ensureEnvironment`, `disconnectEnvironment` via `SshEnvironmentManager` in
 [packages/ssh/src/tunnel.ts][sshtunnel]), but no app in this fork wires it to a UI yet — the
 desktop app that owned SSH-managed environments upstream is not part of this fork. Remote access
-today is pairing against endpoints the server advertises (direct or Tailscale serve).
+today is pairing against endpoints the server advertises (direct, relay, or Tailscale serve).
 
 Upstream, the desktop main process owned this because it could spawn SSH, manage prompts, write
 launch scripts, and clean up forwards. Any future client needs the same abilities, and the renderer
@@ -182,7 +182,7 @@ it separate from access.
 - **Pre-existing server.** The operator already runs T3 and the client connects directly or through a
   tunnel.
 - **Client-managed local publish.** A local server is published through the relay (`t3 connect
-  link` upstream), exposing a locally hosted environment to other devices without router or firewall
+link` upstream), exposing a locally hosted environment to other devices without router or firewall
   changes. The link flow lives in `apps/web/src/cloud/linkEnvironment.ts`.
 
 The same `ExecutionEnvironment` can be reached several of these ways. Only the launch and access

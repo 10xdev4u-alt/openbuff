@@ -9,8 +9,8 @@ layer does not know which one is behind a thread.
 
 [`builtInDrivers.ts`][drivers] exports `BUILT_IN_DRIVERS` with one entry:
 
-| Driver kind | Driver source                        |
-| ----------- | ------------------------------------ |
+| Driver kind | Driver source                           |
+| ----------- | --------------------------------------- |
 | `freebuff`  | [`Drivers/FreebuffDriver.ts`][freebuff] |
 
 The driver wraps `@codebuff/sdk` in-process: the SDK executes the agent loop and the adapter maps
