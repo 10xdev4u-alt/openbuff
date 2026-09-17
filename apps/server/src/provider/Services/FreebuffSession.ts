@@ -456,13 +456,20 @@ export function classifySessionPoll(res: FreebuffSessionResponse): SessionPollCl
   }
 }
 
-/** Best-effort release of the session slot (DELETE). Never throws. */
+/**
+ * Best-effort release of the session slot (DELETE). Resolves on transport
+ * errors and non-2xx responses — the server-side sweep is the backstop for a
+ * seat we could not release. The adapter wires this into `stopSession` so a
+ * stopped thread does not hold the account's seat until the sweep (issue #55).
+ */
 export async function releaseFreebuffSession(
   token: string,
   instanceId: string,
+  opts: { fetch?: typeof fetch } = {},
 ): Promise<void> {
+  const doFetch = opts.fetch ?? nativeFetch;
   try {
-    await nativeFetch(`${FREEBUFF_API_BASE}/api/v1/freebuff/session`, {
+    await doFetch(`${FREEBUFF_API_BASE}/api/v1/freebuff/session`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${token}`,
