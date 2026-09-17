@@ -12,13 +12,14 @@ npx openbuff@latest
 
 - **Local-first.** A server runs on *your* machine (the execution boundary: files, terminals, git). The web UI is served from it. Nothing of ours runs in the cloud — there is no "ours" to run.
 - **Freebuff-powered.** The agent engine is [Freebuff](https://freebuff.com)'s (via `@codebuff/sdk`, Apache-2.0) — free-tier models, no ads in this app, no telemetry from this app. Bring a free API key from [codebuff.com/api-keys](https://codebuff.com/api-keys) and you're running.
-- **Flagship UI.** A fork of the gorgeous [t3 Code](https://t3.codes) web experience, rebranded and refocused around a single engine.
+- **Flagship UI.** A fork of [t3 Code](https://t3.codes)' web experience (MIT), refocused around a single engine.
 
 ## Status: very early fork
 
-This project is a fork of [pingdotgg/t3code](https://github.com/pingdotgg/t3code) (MIT), trimmed to its
-web + server apps, with the five provider drivers (Codex, Claude, Cursor, Grok, OpenCode) being
-replaced by a single Freebuff driver.
+This project is a fork of [pingdotgg/t3code](https://github.com/pingdotgg/t3code) (MIT), trimmed to
+its web + server apps. The five upstream provider drivers (Codex, Claude, Cursor, Grok, OpenCode)
+are replaced by a single Freebuff driver: `BUILT_IN_DRIVERS` in
+`apps/server/src/provider/builtInDrivers.ts` contains exactly one entry.
 
 Roadmap:
 

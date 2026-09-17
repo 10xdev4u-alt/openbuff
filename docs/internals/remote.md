@@ -1,11 +1,10 @@
 # Remote Architecture
 
-> For maintainers. Using T3 Code? See [docs/user](../user/).
+> For maintainers. Upstream T3 Code user docs live in [docs/user](../user/).
 
-Remote environments are shipped, not planned. Direct, bearer-paired, relay-tunneled, Tailscale, and
-desktop-managed SSH access all exist today. This document describes the model they share and where
-each piece lives. For the user-facing setup guide see
-[remote access](../user/remote-access.md).
+Remote environments are shipped, not planned. Direct, relay-tunneled, and Tailscale access all exist
+today. This document describes the model they share and where each piece lives. For the
+user-facing setup guide see [remote access](../user/remote-access.md).
 
 ## The model
 
@@ -15,14 +14,14 @@ the connection layer, never by splitting the runtime.
 
 ```text
 ┌──────────────────────────────────────────────┐
-│ Client (desktop / mobile / web)              │
+│ Client (web)                                 │
 │  known environments, connection supervisor   │
 └───────────────┬──────────────────────────────┘
                 │ resolves one access endpoint
 ┌───────────────▼──────────────────────────────┐
 │ Access method                                │
 │  direct ws/wss, relay tunnel,                │
-│  Tailscale serve, desktop-managed ssh        │
+│  Tailscale serve                             │
 └───────────────┬──────────────────────────────┘
                 │ connects to one T3 server
 ┌───────────────▼──────────────────────────────┐
@@ -38,8 +37,8 @@ One running T3 server instance. It owns provider availability and auth, model av
 and threads, terminal processes, filesystem access, git operations, and server settings.
 
 It is identified by a stable `environmentId`, persisted by the server at `<stateDir>/environment-id`
-and generated on first start (`apps/server/src/environment/ServerEnvironment.ts`). Desktop, mobile,
-and web all reason about the same concept.
+and generated on first start (`apps/server/src/environment/ServerEnvironment.ts`). All clients
+reason about the same concept.
 
 ### Known environments and connection targets
 
@@ -52,10 +51,10 @@ control plane or a copy of session state.
 
 | Target                    | Used for                                                                 |
 | ------------------------- | ------------------------------------------------------------------------ |
-| `PrimaryConnectionTarget` | The platform-managed local server (desktop backend, CLI-served web app). |
+| `PrimaryConnectionTarget` | The platform-managed local server (CLI-served web app).                |
 | `BearerConnectionTarget`  | Any manually paired endpoint reached over direct HTTP/WebSocket.         |
-| `RelayConnectionTarget`   | Managed T3 Connect relay tunnels.                                        |
-| `SshConnectionTarget`     | Desktop-managed SSH environments.                                        |
+| `RelayConnectionTarget`   | Managed relay tunnels (brokered outside this repo).                       |
+| `SshConnectionTarget`     | SSH environments (upstream; unwired here).                                |
 
 Bearer, relay, and SSH are persisted; primary is platform-managed. Note that Tailscale is not a
 separate target kind. A Tailscale URL is paired through the ordinary bearer path in
@@ -65,7 +64,7 @@ concept.
 
 ### AdvertisedEndpoint
 
-A server- or desktop-authored candidate endpoint for an environment: a concrete HTTP and WebSocket
+A server-authored candidate endpoint for an environment: a concrete HTTP and WebSocket
 base URL pair, a default/available/unavailable marker, reachability hints (loopback, LAN, private,
 public, tunnel), and compatibility hints such as whether the hosted HTTPS app can use it.
 
@@ -98,7 +97,7 @@ Tailscale is the first provider, and T3 manages more than discovery. When `tails
 set, the server acquires a Tailscale serve mapping for its actual listening port at startup with
 `ensureTailscaleServe` and releases it with `disableTailscaleServe` on scope close
 (`apps/server/src/server.ts`, using [`@t3tools/tailscale`](../../packages/tailscale/src/tailscale.ts)).
-Endpoint identifiers are synthesized in `apps/desktop/src/backend/tailscaleEndpointProvider.ts` with
+Endpoint synthesis for pairing lives in `packages/shared/src/advertisedEndpoint.ts` with
 `private-network` reachability.
 
 ### Hosted pairing request
@@ -119,7 +118,7 @@ Constraints:
 - the hosted app does not proxy HTTP or WebSocket traffic;
 - the backend must be directly reachable from the browser;
 - HTTPS pages can only reach HTTPS/WSS backends;
-- HTTP LAN endpoints keep using direct desktop or CLI pairing URLs;
+- HTTP LAN endpoints keep using direct pairing URLs served by the CLI;
 - the token belongs in the hash so it is never sent to the hosted app origin.
 
 ### RepositoryIdentity and Project
@@ -137,38 +136,38 @@ how the server got started or who manages the process.
 ### Direct WebSocket access
 
 `wss://t3.example.com` or `ws://10.0.0.15:3773`, paired as a bearer target. This is the base model.
-It works for desktop, mobile, and web with no client-side process management. Browser security rules
+It works for any browser client with no client-side process management. Browser security rules
 are part of it: a hosted HTTPS client cannot connect to plain `ws://` or `http://` LAN backends.
 
 ### Relay-tunneled access
 
-Managed T3 Connect relay tunnels use `RelayConnectionTarget` and are the answer when the host is
-behind NAT, inbound ports are unavailable, or mobile must reach a desktop-hosted environment. From
-the client's perspective this is still an ordinary WebSocket connection; the route is mediated. The
-relay Worker only brokers credentials and a managed endpoint; application traffic then flows over
-the provisioned Cloudflare tunnel hostname for the life of the connection, not through the relay
-Worker itself. See [t3-connect.md](./t3-connect.md).
+Relay connection targets (`RelayConnectionTarget`, defined in
+[`packages/client-runtime/src/connection/model.ts`][model] and brokered through the schemas in
+[`packages/contracts/src/relay.ts`](../../packages/contracts/src/relay.ts)) are the answer when the
+host is behind NAT and inbound ports are unavailable. From the client's perspective this is still an
+ordinary WebSocket connection; the route is mediated. The relay service brokers credentials and a
+managed endpoint; application traffic then flows over the provisioned tunnel hostname for the life
+of the connection. The hosted relay infrastructure itself runs outside this repository; the
+client-side link flow that speaks to it lives in `apps/web/src/cloud/`
+(`linkEnvironment.ts`, `connectCliAuth.ts`, `dpop.ts`).
 
 ### Tailscale access
 
-A T3-managed `tailscale serve` mapping exposes the server on the tailnet over HTTPS, and the
+A `tailscale serve` mapping exposes the server on the tailnet over HTTPS, and the
 resulting private-network endpoints are advertised for pairing. Connection then follows the ordinary
 bearer path.
 
-### Desktop-managed SSH access
+### SSH access
 
-SSH is an access and launch helper, not a separate environment type. `DesktopSshEnvironment`
-([apps/desktop/src/ssh/DesktopSshEnvironment.ts][sshenv]) exposes `discoverHosts`,
-`ensureEnvironment`, and `disconnectEnvironment`. It discovers targets from SSH config and known
-hosts, owns password/askpass prompts, and delegates lifecycle to `SshEnvironmentManager` in
-[packages/ssh/src/tunnel.ts][sshtunnel], which resolves the target, launches or reuses the remote T3
-server, opens a local tunnel, checks HTTP readiness, optionally issues a remote pairing token, and
-returns local HTTP/WS endpoints. Disconnect closes the tunnel and stops the remote server if the
-launcher started it; a server that was already running (marked `external`) is left running.
+`packages/ssh` carries the upstream SSH tunnel/environment manager (`discoverHosts`,
+`ensureEnvironment`, `disconnectEnvironment` via `SshEnvironmentManager` in
+[packages/ssh/src/tunnel.ts][sshtunnel]), but no app in this fork wires it to a UI yet — the
+desktop app that owned SSH-managed environments upstream is not part of this fork. Remote access
+today is pairing against endpoints the server advertises (direct or Tailscale serve).
 
-The desktop main process owns this because it can spawn SSH, manage prompts, write launch scripts,
-and clean up forwards. The renderer connects through the forwarded URL like any other environment and
-needs no SSH-specific RPC path.
+Upstream, the desktop main process owned this because it could spawn SSH, manage prompts, write
+launch scripts, and clean up forwards. Any future client needs the same abilities, and the renderer
+would connect through the forwarded URL like any other environment with no SSH-specific RPC path.
 
 Failure handling is explicit: SSH auth failure surfaces before an environment is saved, remote launch
 failure includes launcher output where available, forwarded-port failure leaves the environment
@@ -182,13 +181,9 @@ it separate from access.
 
 - **Pre-existing server.** The operator already runs T3 and the client connects directly or through a
   tunnel.
-- **Desktop-managed remote launch over SSH.** Desktop probes the machine, launches or reuses a remote
-  server, forwards a port, and the renderer connects normally. The saved environment records that it
-  came from SSH launch for reconnect and lifecycle UX only; that metadata never changes the protocol
-  or the identity model.
-- **Client-managed local publish.** A local server is published through the relay with
-  `t3 connect link`, exposing a desktop-hosted environment to mobile without router or firewall
-  changes.
+- **Client-managed local publish.** A local server is published through the relay (`t3 connect
+  link` upstream), exposing a locally hosted environment to other devices without router or firewall
+  changes. The link flow lives in `apps/web/src/cloud/linkEnvironment.ts`.
 
 The same `ExecutionEnvironment` can be reached several of these ways. Only the launch and access
 paths differ.
@@ -225,11 +220,10 @@ supervisor owns the resulting disconnect and reconnect like any other involuntar
 These remain unbuilt and are listed to keep the model honest:
 
 - third-party tunnel products as additional endpoint providers;
-- a relay-hosted OAuth callback broker (see [t3-connect.md](./t3-connect.md));
+- a relay-hosted OAuth callback broker;
 - richer multi-environment UI beyond the current connections list.
 
 [model]: ../../packages/client-runtime/src/connection/model.ts
 [onboarding]: ../../packages/client-runtime/src/connection/onboarding.ts
 [authremote]: ../../packages/client-runtime/src/authorization/remote.ts
-[sshenv]: ../../apps/desktop/src/ssh/DesktopSshEnvironment.ts
 [sshtunnel]: ../../packages/ssh/src/tunnel.ts

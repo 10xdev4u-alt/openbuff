@@ -1,6 +1,11 @@
 # Resource telemetry architecture
 
-> For maintainers. Using T3 Code? See [docs/user](../user/).
+> For maintainers. Upstream T3 Code user docs live in [docs/user](../user/).
+
+> **Fork note:** this document describes the upstream architecture. Everything server-side is real
+> here (`native/resource-monitor`, `apps/server/src/resourceTelemetry`,
+> `packages/contracts/src/resourceTelemetry.ts`). The Electron publisher side is upstream-only —
+> this fork ships web + server, so nothing feeds fd 4 and host-power fields degrade to `unknown`.
 
 Status: implemented
 
@@ -25,7 +30,7 @@ The monitor is intentionally not a Node native addon.
 - A monitor crash cannot corrupt the Node runtime.
 - The server can supervise, restart, version-check, and measure the monitor as a
   normal child process.
-- The same protocol works for the desktop app and the published CLI.
+- The same protocol serves the (upstream) desktop app and the published CLI.
 - Packaging is a single platform executable instead of an addon toolchain plus
   Node/Electron ABI matrix.
 
@@ -35,7 +40,7 @@ native code into Node.
 
 ## Runtime topology
 
-### Desktop
+### Desktop (upstream only)
 
 ```text
 Electron main
@@ -57,7 +62,7 @@ Electron telemetry is unavailable. The native monitor still runs beside the
 server and tracks the server process tree. Power fields degrade to `unknown`
 instead of invoking platform shell commands.
 
-### WSL backend limitation
+### WSL backend limitation (upstream)
 
 Windows desktop packages currently ship the Windows resource-monitor executable.
 That executable cannot run inside the Linux WSL backend, so a WSL-only backend
@@ -175,9 +180,10 @@ per-process `ioSemantics` value.
 Group totals are observed deltas since telemetry startup. Per-process total
 columns are the operating system's cumulative counters for that process.
 
-## Electron telemetry
+## Electron telemetry (upstream)
 
-Electron main owns `DesktopTelemetryPublisher`.
+Upstream Electron main owns `DesktopTelemetryPublisher`. No Electron app exists in this fork,
+so no process plays that role here.
 
 Power events trigger an immediate snapshot. While diagnostics is closed, the
 server sends the configured active and idle host-power intervals to Electron
@@ -208,7 +214,7 @@ missed resume event cannot leave telemetry permanently constrained.
 Electron does not expose a cross-platform low-power-mode getter, so that field
 remains `unknown`.
 
-The desktop backend is spawned with:
+Upstream, the desktop backend is spawned with:
 
 - fd 3 for the existing bootstrap payload;
 - fd 4 for Electron-to-server telemetry NDJSON;
@@ -226,7 +232,7 @@ The implementation is under `apps/server/src/resourceTelemetry`.
 Resolves an executable from:
 
 1. `T3CODE_RESOURCE_MONITOR_PATH`;
-2. desktop bootstrap configuration;
+2. desktop bootstrap configuration (upstream);
 3. bundled CLI resources;
 4. local Cargo build outputs.
 
@@ -254,7 +260,7 @@ Snapshot sequence numbers are scoped to a monitor generation. Server ingestion
 uses the monitor restart count as the generation key, so sequence reset after a
 restart cannot freeze telemetry.
 
-### `DesktopTelemetryReceiver`
+### `DesktopTelemetryReceiver` (no publisher in this fork)
 
 Reads fd 4, decodes schema-validated messages, stores the latest Electron
 snapshot, and publishes desktop health. It writes diagnostics demand to fd 5
@@ -337,7 +343,7 @@ longer start recurring process-table commands.
 
 ## Packaging
 
-Desktop artifact builds compile the Rust target, stage it as
+Upstream, desktop artifact builds compile the Rust target, stage it as
 `resources/resource-monitor/t3-resource-monitor[.exe]`, and pass its path to the
 backend bootstrap.
 

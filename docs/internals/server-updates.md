@@ -1,6 +1,6 @@
 # Server Update Architecture
 
-> For maintainers. Using T3 Code? See [docs/user](../user/).
+> For maintainers. Upstream T3 Code user docs live in [docs/user](../user/).
 
 Remote server updates use one stable systemd launcher. Foreground CLI processes do not self-update,
 and a running server never edits its systemd unit or durable service state.
@@ -13,8 +13,8 @@ The service files under `<baseDir>/runtime` are:
 - `service-state.json`, the launcher's durable selection state;
 - `versions/<version>`, immutable exact-version npm installs.
 
-The launcher is the only runtime writer of `service-state.json`. `t3 service install` and
-`t3 service update` may replace the launcher and state while the unit is stopped. Server children
+The launcher is the only runtime writer of `service-state.json`. `openbuff service install` and
+`openbuff service update` may replace the launcher and state while the unit is stopped. Server children
 only communicate with the launcher over their inherited IPC channel.
 
 The state contains one active version and, at most, one update record:
@@ -28,7 +28,7 @@ Every write uses same-directory replacement plus file and directory fsync.
 
 ## Remote Update
 
-1. The active server installs `t3@<target>` into a unique staging directory.
+1. The active server installs `openbuff@<target>` into a unique staging directory.
 2. The target runs `__service-preflight` and verifies that the stable launcher supports its update
    protocol.
 3. The staging directory is renamed to its immutable version path only after preflight succeeds.
@@ -64,7 +64,7 @@ The protocol version is part of the safety boundary. A target that requires data
 blocked when the installed launcher is too old. Upgrade the launcher once with:
 
 ```sh
-npx t3@<version> service update
+npx openbuff@<version> service update
 ```
 
 The local command stops the unit, selects the new launcher and exact runtime, then restarts the
@@ -84,8 +84,8 @@ recorded reason. Older servers without an ID retain version-only reconnect behav
 
 The existing additive RPC and lifecycle schemas remain compatible with older clients. New servers
 advertise remote self-update only when they have valid launcher context and a live IPC channel.
-Desktop-managed servers direct the user to update the desktop app. Other process shapes provide a
-manual command; the old detached foreground respawn path no longer exists.
+Servers running under a host-managed launcher direct the user to update the host application. Other
+process shapes provide a manual command; the old detached foreground respawn path no longer exists.
 
 ## Source Map
 
