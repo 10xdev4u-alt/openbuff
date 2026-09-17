@@ -233,4 +233,20 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
       expect(commands).toContain("systemctl --user disable --now t3code.service");
     }),
   );
+
+  it.effect("aborts the install when the legacy stop fails", () =>
+    Effect.gen(function* () {
+      const { service, fs, path, control, home } = yield* makeHarness();
+      const legacyUnitPath = path.join(home, ".config", "systemd", "user", "t3code.service");
+      yield* fs.makeDirectory(path.dirname(legacyUnitPath), { recursive: true });
+      yield* fs.writeFileString(legacyUnitPath, "[Unit]\nDescription=legacy install\n");
+      control.failCommand = "systemctl --user disable --now t3code.service";
+
+      expect((yield* service.install.pipe(Effect.flip))._tag).toBe("BootServiceCommandError");
+      // Fail closed: the legacy unit stays (still stoppable on the next
+      // attempt) and the new unit never starts alongside it.
+      expect(yield* fs.exists(legacyUnitPath)).toBe(true);
+      expect(yield* fs.exists(path.join(home, ".config", "systemd", "user", "openbuff.service"))).toBe(false);
+    }),
+  );
 });

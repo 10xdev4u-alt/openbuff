@@ -310,9 +310,10 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
 
     // Legacy-unit migration (issue #67): installs from before the openbuff
     // rename carry a live `t3code.service`. Disable and remove it *before*
-    // the new unit starts, so boot never runs both launchers. Best-effort:
-    // a host without the old unit (or where systemd rejects the disable)
-    // must not block the fresh install.
+    // the new unit starts, so boot never runs both launchers. Strict, like
+    // every other step: if the legacy stop fails, aborting with the legacy
+    // unit intact beats removing the file and letting an unstoppable launcher
+    // race the new one (CodeRabbit Major, #69).
     const legacyUnitExists = yield* fs
       .exists(legacyUnitPath)
       .pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
@@ -322,14 +323,14 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
         "disable",
         "--now",
         BOOT_SERVICE_LEGACY_UNIT_FILE,
-      ]).pipe(Effect.ignore);
+      ]);
       yield* fs
         .remove(legacyUnitPath)
         .pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
       yield* runStep("reloading systemd user units after legacy removal", "systemctl", [
         "--user",
         "daemon-reload",
-      ]).pipe(Effect.ignore);
+      ]);
     }
 
     yield* Effect.gen(function* () {
