@@ -456,21 +456,47 @@ export function classifySessionPoll(res: FreebuffSessionResponse): SessionPollCl
   }
 }
 
-/** Best-effort release of the session slot (DELETE). Never throws. */
+/**
+ * Best-effort release of the session slot (DELETE). Resolves on transport
+ * errors, non-2xx responses, and its own timeout bound (a hung transport must
+ * not park `stopSession`/`stopAll` — the server-side sweep is the backstop
+ * for a seat we could not release). The adapter wires this into `stopSession`
+ * so a stopped thread does not hold the account's seat until the sweep
+ * (issue #55).
+ */
+const RELEASE_TIMEOUT_MS = 5_000;
+
 export async function releaseFreebuffSession(
   token: string,
   instanceId: string,
+  opts: { fetch?: typeof fetch; timeoutMs?: number } = {},
 ): Promise<void> {
+  const doFetch = opts.fetch ?? nativeFetch;
+  const timeoutMs = opts.timeoutMs ?? RELEASE_TIMEOUT_MS;
+  // Race, not just an abort signal: the signal bounds real transports, but a
+  // fetch implementation that ignores `signal` (or a wedged one) would never
+  // settle on its own — the race rejects when the platform signal aborts and
+  // guarantees the caller is released. (Effect timer APIs don't reach plain
+  // async land; the platform timer inside AbortSignal.timeout is the bound.)
+  const signal = AbortSignal.timeout(timeoutMs);
   try {
-    await nativeFetch(`${FREEBUFF_API_BASE}/api/v1/freebuff/session`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "x-freebuff-instance-id": instanceId,
-      },
-    });
+    await Promise.race([
+      doFetch(`${FREEBUFF_API_BASE}/api/v1/freebuff/session`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "x-freebuff-instance-id": instanceId,
+        },
+        signal,
+      }),
+      new Promise<never>((_, reject) => {
+        signal.addEventListener("abort", () => reject(new Error("freebuff session release timed out")), {
+          once: true,
+        });
+      }),
+    ]);
   } catch {
-    // The server-side sweep is the backstop.
+    // Timeout or transport failure: the server-side sweep is the backstop.
   }
 }
 

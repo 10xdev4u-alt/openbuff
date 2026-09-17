@@ -89,6 +89,7 @@ import {
   formatModelUnavailableProse,
   installFreebuffFetchInterceptor,
   pollFreebuffSession,
+  releaseFreebuffSession,
   runWithFreebuffSession,
 } from "./FreebuffSession.ts";
 
@@ -104,6 +105,19 @@ export interface MakeFreebuffAdapterOptions {
    * absent (tests, non-snapshot embeddings) simply skips the capture.
    */
   readonly usageRef?: { current: FreebuffProviderUsage | undefined };
+  /**
+   * Transport override for the session REST calls (admission GET/POST, polls,
+   * DELETE release). Mirrors `FreebuffSession.ts`'s `opts.fetch` convention so
+   * tests can inject doubles instead of hitting the network. Optional: absent
+   * means the module-bound native fetch (production default).
+   */
+  readonly fetchImpl?: typeof fetch;
+  /**
+   * SDK client seam. Optional: absent constructs a real `CodebuffClient`;
+   * tests inject a stub whose `run` never resolves so the forked turn stays
+   * a parked fiber instead of attempting real network traffic.
+   */
+  readonly clientFactory?: () => Promise<unknown>;
 }
 
 /** A command approval parked while the web UI decides (see #4). */
@@ -247,7 +261,7 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
   Scope.Scope | Crypto.Crypto
 > =>
   Effect.gen(function* () {
-    const { config, instanceId, usageRef } = options;
+    const { config, instanceId, usageRef, fetchImpl, clientFactory } = options;
     const crypto = yield* Crypto.Crypto;
     const newUuid = (): string => Effect.runSync(crypto.randomUUIDv4);
     const runtimeEvents = yield* Queue.unbounded<ProviderRuntimeEvent>();
@@ -391,6 +405,7 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
             try: () =>
               pollFreebuffSession(config.apiKey, instanceId, {
                 signal: abort.signal,
+                ...(fetchImpl !== undefined ? { fetch: fetchImpl } : {}),
               }),
             catch: (cause) =>
               new ProviderAdapterRequestError({
@@ -474,6 +489,7 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
               establishFreebuffSession(config.apiKey, {
                 signal: abort.signal,
                 ...(modelSelection !== undefined ? { model: modelSelection } : {}),
+                ...(fetchImpl !== undefined ? { fetch: fetchImpl } : {}),
               }),
             catch: (cause) =>
               new ProviderAdapterRequestError({
@@ -514,21 +530,23 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
           }
         }
 
-        const client = new CodebuffClient({
-          apiKey: config.apiKey,
-          // Surface SDK internals on stderr: without a logger the run()
-          // promise can fail silently (invalid agent, auth, network). The SDK
-          // fires these callbacks from promise-land, outside any Effect
-          // runtime, so they go straight to stderr rather than Effect.log*.
-          logger: {
-            debug: () => {},
-            info: () => {},
-            warn: (...args: unknown[]) =>
-              process.stderr.write(`[freebuff-sdk:warn] ${args.map(String).join(" ")}\n`),
-            error: (...args: unknown[]) =>
-              process.stderr.write(`[freebuff-sdk:error] ${args.map(String).join(" ")}\n`),
-          } as never,
-        });
+        const client = (clientFactory
+          ? yield* Effect.promise(() => clientFactory())
+          : new CodebuffClient({
+              apiKey: config.apiKey,
+              // Surface SDK internals on stderr: without a logger the run()
+              // promise can fail silently (invalid agent, auth, network). The SDK
+              // fires these callbacks from promise-land, outside any Effect
+              // runtime, so they go straight to stderr rather than Effect.log*.
+              logger: {
+                debug: () => {},
+                info: () => {},
+                warn: (...args: unknown[]) =>
+                  process.stderr.write(`[freebuff-sdk:warn] ${args.map(String).join(" ")}\n`),
+                error: (...args: unknown[]) =>
+                  process.stderr.write(`[freebuff-sdk:error] ${args.map(String).join(" ")}\n`),
+              } as never,
+            })) as CodebuffClient;
         const prompt = input.input;
         const previousRun = state.runState;
         const cwd = state.session.cwd;
@@ -838,13 +856,43 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
         return Effect.void;
       });
 
+    /**
+     * Explicit upstream release on stop (issue #55, server half). Fires only
+     * when this adapter owns a live seat: never for `superseded` (another
+     * client owns the seat — a DELETE here would evict *their* session), and
+     * never when no admission happened. Never fails `stopSession` — the
+     * upstream sweep is the backstop when the DELETE cannot get through.
+     */
+    const releaseUpstreamSeat = (state: FreebuffSession): Effect.Effect<void> => {
+      if (state.gateState === "superseded") return Effect.void;
+      const instanceId = state.freebuffInstanceId;
+      if (instanceId === undefined) return Effect.void;
+      return Effect.ignoreCause(
+        Effect.promise(() =>
+          releaseFreebuffSession(config.apiKey, instanceId, {
+            ...(fetchImpl !== undefined ? { fetch: fetchImpl } : {}),
+          }),
+        ),
+      );
+    };
+
     const stopSession: ProviderAdapterShape<ProviderAdapterError>["stopSession"] = (threadId) =>
       Effect.suspend(() => {
         const state = sessions.get(threadId);
         if (!state) return Effect.fail<ProviderAdapterError>(sessionNotFound(threadId));
         state.activeTurn?.abort.abort();
-        sessions.delete(threadId);
-        return Effect.void;
+        return Effect.asVoid(
+          Effect.andThen(
+            releaseUpstreamSeat(state),
+            Effect.sync(() => {
+              // A concurrent startSession may have replaced this entry while
+              // the release awaited — remove only the captured state.
+              if (sessions.get(threadId) === state) {
+                sessions.delete(threadId);
+              }
+            }),
+          ),
+        );
       });
 
     const listSessions: ProviderAdapterShape<ProviderAdapterError>["listSessions"] = () =>
@@ -880,9 +928,10 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
       });
 
     const stopAll: ProviderAdapterShape<ProviderAdapterError>["stopAll"] = () =>
-      Effect.sync(() => {
+      Effect.gen(function* () {
         for (const state of sessions.values()) {
           state.activeTurn?.abort.abort();
+          yield* releaseUpstreamSeat(state);
         }
         sessions.clear();
       });
