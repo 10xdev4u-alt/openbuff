@@ -105,7 +105,7 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
       ),
     ),
   );
-  return { service, fs, statePath, commands, control };
+  return { service, fs, path: yield* Path.Path, statePath, commands, control, home };
 });
 
 it.layer(NodeServices.layer)("boot service install", (it) => {
@@ -161,9 +161,9 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
       const error = yield* service.install.pipe(Effect.flip);
       expect(error._tag).toBe("BootServiceCommandError");
       expect(commands.filter((command) => command.startsWith("systemctl "))).toEqual([
-        "systemctl --user stop t3code.service",
+        "systemctl --user stop openbuff.service",
         "systemctl --user daemon-reload",
-        "systemctl --user restart t3code.service",
+        "systemctl --user restart openbuff.service",
       ]);
     }),
   );
@@ -189,8 +189,8 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
       expect((yield* service.install.pipe(Effect.flip))._tag).toBe("BootServiceUpdatePendingError");
       expect(serviceStateHasPendingUpdate(yield* fs.readFileString(statePath))).toBe(true);
       expect(commands.filter((command) => command.startsWith("systemctl "))).toEqual([
-        "systemctl --user stop t3code.service",
-        "systemctl --user restart t3code.service",
+        "systemctl --user stop openbuff.service",
+        "systemctl --user restart openbuff.service",
       ]);
     }),
   );
@@ -200,6 +200,37 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
       const { service } = yield* makeHarness("darwin");
       expect((yield* service.status).supported).toBe(false);
       expect((yield* service.install.pipe(Effect.flip))._tag).toBe("BootServiceUnsupportedError");
+    }),
+  );
+
+  it.effect("migrates a legacy t3code unit during install", () =>
+    Effect.gen(function* () {
+      const { service, fs, path, commands, home } = yield* makeHarness();
+      const legacyUnitPath = path.join(home, ".config", "systemd", "user", "t3code.service");
+      yield* fs.makeDirectory(path.dirname(legacyUnitPath), { recursive: true });
+      yield* fs.writeFileString(legacyUnitPath, "[Unit]\nDescription=legacy install\n");
+
+      const plan = yield* service.install;
+
+      // The new unit wins and the legacy unit is gone.
+      expect(plan.unitPath).toContain("openbuff.service");
+      expect(yield* fs.exists(legacyUnitPath)).toBe(false);
+      expect(commands).toContain("systemctl --user disable --now t3code.service");
+      expect(commands).toContain("systemctl --user daemon-reload");
+      expect((yield* service.status).current).toBe(true);
+    }),
+  );
+
+  it.effect("uninstall removes a legacy unit left behind", () =>
+    Effect.gen(function* () {
+      const { service, fs, path, commands, home } = yield* makeHarness();
+      const legacyUnitPath = path.join(home, ".config", "systemd", "user", "t3code.service");
+      yield* fs.makeDirectory(path.dirname(legacyUnitPath), { recursive: true });
+      yield* fs.writeFileString(legacyUnitPath, "[Unit]\nDescription=legacy install\n");
+
+      expect(yield* service.uninstall).toBe(true);
+      expect(yield* fs.exists(legacyUnitPath)).toBe(false);
+      expect(commands).toContain("systemctl --user disable --now t3code.service");
     }),
   );
 });
