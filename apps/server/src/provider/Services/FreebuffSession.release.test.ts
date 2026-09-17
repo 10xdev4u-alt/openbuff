@@ -48,4 +48,17 @@ describe("releaseFreebuffSession (DELETE /api/v1/freebuff/session)", () => {
       }),
     ).resolves.toBeUndefined();
   });
+
+  it("bounds a hung transport — a never-settling fetch must not park the caller", async () => {
+    // Boundedness is proven structurally: an unbounded release would never
+    // settle and the test runner's per-test timeout would fail this spec.
+    await expect(
+      releaseFreebuffSession("tok-1", "inst-9", {
+        fetch: asFetch(
+          () => new Promise<Response>(() => {}),
+        ),
+        timeoutMs: 50,
+      }),
+    ).resolves.toBeUndefined();
+  });
 });

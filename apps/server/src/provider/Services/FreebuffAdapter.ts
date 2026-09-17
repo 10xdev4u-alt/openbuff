@@ -885,7 +885,11 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
           Effect.andThen(
             releaseUpstreamSeat(state),
             Effect.sync(() => {
-              sessions.delete(threadId);
+              // A concurrent startSession may have replaced this entry while
+              // the release awaited — remove only the captured state.
+              if (sessions.get(threadId) === state) {
+                sessions.delete(threadId);
+              }
             }),
           ),
         );
