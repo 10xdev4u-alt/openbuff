@@ -189,6 +189,12 @@ export const Route = createFileRoute("/_chat")({
       context.authGateState.status !== "authenticated" &&
       context.authGateState.status !== "hosted-static"
     ) {
+      // The root is the product's front door, so first-time visitors get the
+      // landing (issue #33) instead of the pairing surface. Every other
+      // guarded path keeps pointing at pairing.
+      if (location.pathname === "/") {
+        throw redirect({ to: "/welcome", replace: true });
+      }
       throw redirect({ to: "/pair", replace: true });
     }
   },
