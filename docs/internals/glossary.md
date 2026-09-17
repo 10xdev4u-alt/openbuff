@@ -1,8 +1,8 @@
 # Glossary
 
-> For maintainers. Using T3 Code? See [docs/user](../user/).
+> For maintainers.
 
-This is a living glossary for T3 Code. It explains what common terms mean in this codebase.
+This is a living glossary for OpenBuff. It explains what common terms mean in this codebase.
 
 ## Table of contents
 
@@ -94,7 +94,7 @@ The live backend agent implementation and its event stream. The main service is 
 
 #### Provider
 
-The backend agent runtime that actually performs work. Five drivers ship built in: Codex, Claude, Cursor, Grok, and OpenCode. See [ProviderService.ts][14], [ProviderAdapter.ts][15], and [CodexAdapter.ts][17] as a representative adapter.
+The backend agent runtime that actually performs work. One driver ships built in: Freebuff, which wraps `@codebuff/sdk` in-process (see [`builtInDrivers.ts`][17]). The Codex, Claude, Cursor, Grok, and OpenCode drivers from upstream t3 are not present in this fork. See [ProviderService.ts][14], [ProviderAdapter.ts][15], and [FreebuffAdapter.ts][20] as the adapter.
 
 #### Session
 
@@ -118,7 +118,7 @@ A point-in-time view of state. The word is used in multiple layers, including or
 
 ### Checkpointing
 
-Checkpointing captures workspace state over time so the app can diff turns and restore earlier points. The main pieces are [CheckpointStore.ts][19], [CheckpointDiffQuery.ts][20], and [CheckpointReactor.ts][6].
+Checkpointing captures workspace state over time so the app can diff turns and restore earlier points. The main pieces are [CheckpointStore.ts][19], [CheckpointDiffQuery.ts][25], and [CheckpointReactor.ts][6].
 
 #### Checkpoint
 
@@ -134,11 +134,11 @@ The starting checkpoint for diffing a thread timeline. This flow is surfaced thr
 
 #### Checkpoint diff
 
-The patch difference between two checkpoints. Query logic lives in [CheckpointDiffQuery.ts][20], diff parsing lives in [Diffs.ts][23], and finalization is coordinated by [CheckpointReactor.ts][6].
+The patch difference between two checkpoints. Query logic lives in [CheckpointDiffQuery.ts][25], diff parsing lives in [Diffs.ts][23], and finalization is coordinated by [CheckpointReactor.ts][6].
 
 #### Turn diff
 
-The file patch and changed-file summary for one turn. It is usually computed in [CheckpointDiffQuery.ts][20], represented in [the contracts][1], and recorded into thread state by [projector.ts][4].
+The file patch and changed-file summary for one turn. It is usually computed in [CheckpointDiffQuery.ts][25], represented in [the contracts][1], and recorded into thread state by [projector.ts][4].
 
 ## Practical Shortcuts
 
@@ -171,11 +171,12 @@ The file patch and changed-file summary for one turn. It is usually computed in 
 [14]: ../../apps/server/src/provider/Layers/ProviderService.ts
 [15]: ../../apps/server/src/provider/Services/ProviderAdapter.ts
 [16]: ./providers.md
-[17]: ../../apps/server/src/provider/Layers/CodexAdapter.ts
+[17]: ../../apps/server/src/provider/builtInDrivers.ts
 [18]: ../user/permission-modes.md
 [19]: ../../apps/server/src/checkpointing/CheckpointStore.ts
-[20]: ../../apps/server/src/checkpointing/CheckpointDiffQuery.ts
+[20]: ../../apps/server/src/provider/Services/FreebuffAdapter.ts
 [21]: ../../apps/server/src/persistence/Services/ProjectionCheckpoints.ts
 [22]: ../../apps/server/src/checkpointing/Utils.ts
 [23]: ../../apps/server/src/checkpointing/Diffs.ts
 [24]: ./overview.md
+[25]: ../../apps/server/src/checkpointing/CheckpointDiffQuery.ts

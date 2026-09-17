@@ -1,15 +1,14 @@
 # Connection Runtime
 
-> For maintainers. Using T3 Code? See [docs/user](../user/).
+> For maintainers.
 
-The connection runtime is shared by web and mobile. It owns connectivity,
+The connection runtime is shared by the web client. It owns connectivity,
 authentication, retries, transport lifetime, cached environment data, and
 environment-scoped operations.
 
-Web and mobile mount this runtime once at the application root and compose it
-identically: `apps/web/src/connection/runtime.ts` and
-`apps/mobile/src/connection/runtime.ts` differ only in the platform layer they
-supply. There is no legacy connection owner or supported mixed mode.
+The web app mounts this runtime once at the application root
+(`apps/web/src/connection/runtime.ts`) and supplies the platform layer. There is
+no legacy connection owner or supported mixed mode.
 
 ## Composition
 
@@ -63,11 +62,10 @@ Wakeup handling differs by phase, in [supervisor.ts][supervisor]:
 
 - During establishment, `waitForEstablishmentInterrupt` consumes and **ignores**
   plain application activation. Restarting an in-flight attempt because the app
-  came to the foreground would only delay it. The exception is
-  `application-active-reconnect`, which mobile emits after a meaningful
-  background suspension; it interrupts establishment and resets the retry
-  ladder, because the OS may have silently killed the socket underneath the
-  attempt.
+  came to the foreground would only delay it. The runtime also understands the
+  `application-active-reconnect` (interrupt establishment and reset the retry
+  ladder) and `application-active-probe` wakeup reasons; the web client
+  currently emits only plain `application-active`.
 - Credential changes interrupt establishment only for relay targets, where a new
   credential changes what is being established.
 - Explicit disconnect, explicit retry, and going offline interrupt establishment
@@ -76,10 +74,9 @@ Wakeup handling differs by phase, in [supervisor.ts][supervisor]:
   foregrounded app reconnects immediately instead of serving the remaining
   delay.
 - Once connected, `monitorConnectedLease` handles plain activation by probing
-  the existing session (`lease.session.probe`, with a shorter timeout for
-  mobile's `application-active-probe`) rather than reconnecting; a healthy
-  session survives foregrounding. `application-active-reconnect` skips the probe
-  and replaces the lease outright.
+  the existing session (`lease.session.probe`) rather than reconnecting; a
+  healthy session survives foregrounding. An `application-active-reconnect`
+  wakeup skips the probe and replaces the lease outright.
 
 The UI derives `available`, `offline`, `connecting`, `reconnecting`,
 `connected`, and `error` from supervisor state plus explicit data-sync state.
@@ -116,14 +113,14 @@ Finite requests, durable subscriptions, and commands are separate APIs:
   (`createProjectEnvironmentAtoms`, `createThreadEnvironmentAtoms`), as are the
   shell and thread state factories (`createEnvironmentShellAtoms`,
   `createEnvironmentThreadStateAtoms`).
-- Web and mobile own their Atom runtimes, React hooks, and feature composition.
+- The web app owns its Atom runtime, React hooks, and feature composition.
 
 The Promise bridge exists only at the React/Atom boundary. Runtime and business
 logic remain Effect-native.
 
 ## Platform Layers
 
-Web and mobile provide:
+The web platform layer provides:
 
 - network status and network-change streams;
 - application lifecycle wakeups;
@@ -136,7 +133,7 @@ Web and mobile provide:
 Platform layers adapt operating-system capabilities. They do not implement
 connection policy. `EnvironmentOwnedDataCleanup` is part of this contract: on
 removal the registry clears its cache and calls the platform implementation, so
-web clears composer drafts and mobile clears drafts plus the thread outbox.
+the web implementation clears composer drafts.
 
 ## Source Boundaries
 
@@ -149,8 +146,8 @@ list. Files that are not exported are implementation details.
 ## Application Boundary
 
 The application root mounts the shared connection layer, creates its own Atom
-runtime, and selects the domain atom factories required by that platform. Web
-and mobile may expose different hooks and features without changing connection
+runtime, and selects the domain atom factories required by that platform. The
+web app may expose different hooks and features without changing connection
 ownership.
 
 Application code must not construct RPC clients, retry loops, or raw

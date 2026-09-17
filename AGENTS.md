@@ -64,7 +64,10 @@ Hard limit: **6 words or fewer** after the type prefix. Counts as words, not cha
 
 ## Part 2 — Repository Reality (what is actually true here)
 
-OpenBuff is a **fork of pingdotgg/t3code** (MIT) trimmed to its web + server apps, with the five upstream provider CLIs (Codex, Claude, Cursor, Grok, OpenCode) replaced by a **single Freebuff driver** wrapping `@codebuff/sdk` in-process. **Upstream-t3 documentation claims (desktop, mobile, 5 providers, relay) are stale here** — verify against `apps/` before acting on prose.
+OpenBuff is a **fork of pingdotgg/t3code** (MIT) trimmed to its web + server apps, with a
+**single Freebuff driver** wrapping `@codebuff/sdk` in-process (`BUILT_IN_DRIVERS` in
+`apps/server/src/provider/builtInDrivers.ts` holds exactly one entry). Docs outside `apps/` may
+still carry upstream-t3 claims — verify against `apps/` before acting on prose.
 
 Glossary (project / workspace / thread / turn / activity / command / event / decider / projector / reactor / receipt): `docs/internals/glossary.md`.
 

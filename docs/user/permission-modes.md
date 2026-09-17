@@ -15,16 +15,15 @@ wants to run or edit, and waits for approval. Work outside the workspace is rest
 **Auto-accept edits**: auto-approve edits, ask before other actions. File changes go through
 without prompting; commands and anything else still stop for approval.
 
-**Auto**: routine actions proceed without you; risky ones still ask. How this is enforced depends
-on the provider: Codex delegates routine approvals to an AI reviewer, Claude uses its own auto
-permission mode, and providers without an equivalent (such as OpenCode) fall back to asking, like
-Supervised.
+**Auto**: routine actions proceed without you; risky ones still ask. The Freebuff driver enforces
+this like Supervised for shell commands: anything risky still stops for an inline approval.
 
 **Full access**: allow commands and edits without prompts. The default. The agent runs
 unattended until it finishes or asks a question of its own.
 
 Approvals appear inline in the conversation. Approve or reject one and the agent continues from
-there.
+there. Approving a command "for this session" lets later commands run unasked for the rest of
+that session.
 
 ## Choosing a Mode
 
@@ -38,10 +37,9 @@ shell commands.
 
 ## Provider Behavior
 
-Each provider maps these modes onto its own approval and sandbox settings. Codex, for example,
-translates the mode into its approval policy and sandbox level, so **Supervised** runs the CLI
-with prompting enabled and a restricted workspace while **Full access** disables both. The
-labels above describe what you get; the exact per-provider translation is internal and may
-change.
-
-Mobile offers the same four modes with the same labels and descriptions.
+OpenBuff ships one built-in provider (the Freebuff driver), so there is no per-provider mapping
+table. The Freebuff driver enforces the modes directly: **Supervised** and **Auto** gate every
+shell command behind an inline approval you resolve in the conversation, **Auto-accept edits**
+additionally lets file edits through unasked, and **Full access** runs commands without
+prompting. If you approve a command for the whole session, later commands in that session skip
+the prompt.

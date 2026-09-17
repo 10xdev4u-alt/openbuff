@@ -8,25 +8,25 @@ boots and keeps running after you log out.
 Install it with the latest OpenBuff release:
 
 ```sh
-npx t3@latest service install
+npx openbuff@latest service install
 ```
 
 Check whether it is installed:
 
 ```sh
-npx t3@latest service status
+npx openbuff@latest service status
 ```
 
 Update or repair it:
 
 ```sh
-npx t3@latest service update
+npx openbuff@latest service update
 ```
 
 Stop it and remove it from startup:
 
 ```sh
-npx t3@latest service uninstall
+npx openbuff@latest service uninstall
 ```
 
 Updating restarts OpenBuff briefly. Let active agent work and terminal commands finish first.

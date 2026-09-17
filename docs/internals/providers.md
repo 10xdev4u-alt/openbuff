@@ -1,27 +1,23 @@
 # Provider architecture
 
-> For maintainers. Using T3 Code? See [docs/user](../user/).
+> For maintainers.
 
-A provider is the agent runtime that does the actual work. T3 Code supports several, and the
-orchestration layer does not know which one is behind a thread.
+A provider is the agent runtime that does the actual work. OpenBuff ships one, and the orchestration
+layer does not know which one is behind a thread.
 
 ## Built-in drivers
 
-[`builtInDrivers.ts`][drivers] exports `BUILT_IN_DRIVERS` with five entries:
+[`builtInDrivers.ts`][drivers] exports `BUILT_IN_DRIVERS` with one entry:
 
-| Driver kind   | Driver source                           |
-| ------------- | --------------------------------------- |
-| `codex`       | [`Drivers/CodexDriver.ts`][codex]       |
-| `claudeAgent` | [`Drivers/ClaudeDriver.ts`][claude]     |
-| `cursor`      | [`Drivers/CursorDriver.ts`][cursor]     |
-| `grok`        | [`Drivers/GrokDriver.ts`][grok]         |
-| `opencode`    | [`Drivers/OpenCodeDriver.ts`][opencode] |
+| Driver kind | Driver source                           |
+| ----------- | --------------------------------------- |
+| `freebuff`  | [`Drivers/FreebuffDriver.ts`][freebuff] |
 
-Each driver declares its `driverKind`, a `configSchema`, and a `create` function that builds an
-adapter in a child scope. Adapter implementations live beside them in
-`apps/server/src/provider/Layers/` (`CodexAdapter.ts`, `ClaudeAdapter.ts`, and so on) and conform to
-[`ProviderAdapter.ts`][adapter]. Read the driver plus its adapter to see how a specific agent's
-transport, config, and event shapes are mapped.
+The driver wraps `@codebuff/sdk` in-process: the SDK executes the agent loop and the adapter maps
+its callbacks onto the canonical event stream. It declares a `driverKind`, a `configSchema`, and a
+`create` function that builds an adapter in a child scope. The adapter lives in
+`apps/server/src/provider/Services/FreebuffAdapter.ts` and conforms to
+[`ProviderAdapter.ts`][adapter].
 
 ## Registry and routing
 
@@ -76,11 +72,7 @@ when a request opens (approval) or user input is requested, via
 `flushBufferedAssistantMessagesForTurn`.
 
 [drivers]: ../../apps/server/src/provider/builtInDrivers.ts
-[codex]: ../../apps/server/src/provider/Drivers/CodexDriver.ts
-[claude]: ../../apps/server/src/provider/Drivers/ClaudeDriver.ts
-[cursor]: ../../apps/server/src/provider/Drivers/CursorDriver.ts
-[grok]: ../../apps/server/src/provider/Drivers/GrokDriver.ts
-[opencode]: ../../apps/server/src/provider/Drivers/OpenCodeDriver.ts
+[freebuff]: ../../apps/server/src/provider/Drivers/FreebuffDriver.ts
 [adapter]: ../../apps/server/src/provider/Services/ProviderAdapter.ts
 [instances]: ../../apps/server/src/provider/Services/ProviderInstanceRegistry.ts
 [registry]: ../../apps/server/src/provider/Services/ProviderAdapterRegistry.ts

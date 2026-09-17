@@ -1,16 +1,16 @@
 # Observability
 
-> For maintainers. Using T3 Code? See [docs/user](../user/).
+> For maintainers. User-facing docs live in [docs/user](../user/).
 
-T3 Code has one server-side observability model:
+OpenBuff has one server-side observability model:
 
 - pretty logs go to stdout for humans
 - completed spans go to a local NDJSON trace file
 - traces and metrics can also be exported over OTLP to a real backend like Grafana LGTM
 
-The local trace file is the persisted source of truth for normal local launches. Those launches do not
-write a separate server log file, but SSH-managed launches also persist the remote process's
-stdout/stderr at `~/.t3/ssh-launch/<state>/server.log`.
+The local trace file is the persisted source of truth for normal local launches, which write no
+separate server log. The config still derives a `server.log` path for launcher-managed and other
+special runs, but normal local launches persist only stdout plus the trace file.
 
 ## Where To Find Things
 
@@ -21,7 +21,7 @@ Logs are human-facing:
 - destination: stdout
 - format: `Logger.consolePretty()`
 - normal local persistence: none
-- SSH-managed launch persistence: `~/.t3/ssh-launch/<state>/server.log`
+- launcher-managed runs persist a captured `server.log` next to the trace file
 
 If you want a log message to show up in the trace file, emit it inside an active span with `Effect.log...`. `Logger.tracerLogger` will attach it as a span event.
 
@@ -29,10 +29,10 @@ If you want a log message to show up in the trace file, emit it inside an active
 
 Completed spans are written as NDJSON records to `serverTracePath`. The default depends on how the
 server starts: production and explicitly configured homes use
-`<home>/userdata/logs/server.trace.ndjson` (so `~/.t3/userdata/...` by default, or
-`/custom/path/userdata/...` with `--home-dir /custom/path`), a linked worktree dev run uses
-`<worktree>/.t3/userdata/logs/server.trace.ndjson`, and an implicit dev run outside a linked
-worktree uses `~/.t3/dev/logs/server.trace.ndjson`.
+`<home>/userdata/logs/server.trace.ndjson` (so `~/.openbuff/userdata/...` by default, or
+`/custom/path/userdata/...` with `--base-dir /custom/path`); dev runs resolved by the dev runner
+store under the dev home instead (see `scripts/dev-runner.ts`, which resolves the
+`--home-dir` > worktree `.t3` > ambient `T3CODE_HOME` precedence).
 
 Important fields common to both record types:
 
@@ -79,15 +79,11 @@ You do not need any extra env vars. Just run the app normally and inspect `serve
 Examples:
 
 ```bash
-npx t3
+npx openbuff@latest
 ```
 
 ```bash
 node --run dev
-```
-
-```bash
-node --run dev:desktop
 ```
 
 ### Option 2: Run With A Local LGTM Stack
@@ -130,41 +126,13 @@ export T3CODE_TRACE_TIMING_ENABLED=true
 CLI:
 
 ```bash
-npx t3
+npx openbuff@latest
 ```
 
 Monorepo web/server dev:
 
 ```bash
 node --run dev
-```
-
-Monorepo desktop dev:
-
-```bash
-node --run dev:desktop
-```
-
-Packaged desktop app:
-
-Launch the actual app executable from the same shell so the desktop app and embedded backend inherit `T3CODE_OTLP_*`.
-
-macOS app bundle example:
-
-```bash
-T3CODE_OTLP_TRACES_URL=http://localhost:4318/v1/traces \
-T3CODE_OTLP_METRICS_URL=http://localhost:4318/v1/metrics \
-T3CODE_OTLP_SERVICE_NAME=t3-desktop \
-"/Applications/T3 Code.app/Contents/MacOS/T3 Code"
-```
-
-Direct binary example:
-
-```bash
-T3CODE_OTLP_TRACES_URL=http://localhost:4318/v1/traces \
-T3CODE_OTLP_METRICS_URL=http://localhost:4318/v1/metrics \
-T3CODE_OTLP_SERVICE_NAME=t3-desktop \
-./path/to/your/desktop-app-binary
 ```
 
 Do not rely on launching from Finder, Spotlight, the dock, or the Start menu after setting shell env vars. Those launches usually will not pick them up.
@@ -183,20 +151,19 @@ Resolve the path for the launch mode once. Production and explicitly configured 
 state under the base directory's `userdata` folder:
 
 ```bash
-TRACE_FILE="${T3CODE_HOME:-$HOME/.t3}/userdata/logs/server.trace.ndjson"
+TRACE_FILE="${T3CODE_HOME:-$HOME/.openbuff}/userdata/logs/server.trace.ndjson"
 ```
 
-A dev server started from a linked worktree defaults to that worktree's local home:
+A dev run the runner launched with an explicit base (`--home-dir`, a worktree home, or an ambient
+`T3CODE_HOME`) stores under that base's `userdata` folder:
 
 ```bash
-TRACE_FILE="$WORKTREE/.t3/userdata/logs/server.trace.ndjson"
+TRACE_FILE="$T3CODE_HOME/userdata/logs/server.trace.ndjson"
 ```
 
-Only an implicit dev run outside a linked worktree uses the shared dev directory:
-
-```bash
-TRACE_FILE="$HOME/.t3/dev/logs/server.trace.ndjson"
-```
+Only when the base directory is left unset does the server itself derive a `dev` state folder
+(`<base>/dev/logs/server.trace.ndjson`) — check the `baseDir=` line the dev runner prints at
+startup to see which case you are in.
 
 Tail the selected file:
 
@@ -299,7 +266,7 @@ Recommended flow in Grafana:
 
 Good first searches:
 
-- service name such as `t3-local`, `t3-dev`, or `t3-desktop`
+- service name such as `t3-local` or `openbuff-local`
 - span names like `sendTurn` or a Git operation such as `GitVcsDriver.statusDetails.status`
 - Git spans whose `git.operation` attribute identifies the operation
 - orchestration spans with attributes like `orchestration.command_type`
