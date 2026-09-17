@@ -74,6 +74,7 @@ import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { isElectron } from "../env";
 import { readLocalApi } from "../localApi";
+import { resolveModelSwitchConfirmation } from "./chat/modelSwitchConfirmation.logic";
 import { useDiffPanelStore } from "../diffPanelStore";
 import {
   collapseExpandedComposerCursor,
@@ -1245,6 +1246,9 @@ function ChatViewContent(props: ChatViewProps) {
   const openPreview = useAtomCommand(previewEnvironment.open, { reportFailure: false });
   const closePreview = useAtomCommand(previewEnvironment.close, "preview close");
   const { environments } = useEnvironments();
+  // Raw primitive (not useThreadActions): the hook owns stop internally and
+  // does not export it; the seat handoff (#55) needs the same command.
+  const stopThreadSessionCommand = useAtomCommand(threadEnvironment.stopSession);
   const primaryEnvironment = usePrimaryEnvironment();
   const retryEnvironment = useAtomCommand(environmentCatalog.retryNow, { reportFailure: false });
   const environmentById = useMemo(
@@ -5893,7 +5897,7 @@ function ChatViewContent(props: ChatViewProps) {
   );
 
   const onProviderModelSelect = useCallback(
-    (instanceId: ProviderInstanceId, model: string) => {
+    async (instanceId: ProviderInstanceId, model: string) => {
       if (!activeThread) return;
       // Look up the configured instance so model normalization and custom
       // model lookup stay scoped to that exact instance. Unknown instance ids
@@ -5951,6 +5955,35 @@ function ChatViewContent(props: ChatViewProps) {
         scheduleComposerFocus();
         return;
       }
+      // Freebuff seat handoff (#55): switching models on a live free session
+      // releases the seat. Since #60 the release happens server-side on stop;
+      // confirm first, then apply + stop so the next turn re-admits on the
+      // new model. Cancel leaves the session untouched.
+      const confirmation = resolveModelSwitchConfirmation({
+        hasStartedSession: activeThread.session !== null,
+        driver: resolvedDriverKind,
+        currentModel: activeThread.modelSelection?.model,
+        nextModel: resolvedModel,
+        models: entry?.models,
+      });
+      if (confirmation.action === "cancel") {
+        scheduleComposerFocus();
+        return;
+      }
+      if (confirmation.action === "confirm") {
+        const localApi = readLocalApi();
+        const confirmed = (await localApi?.dialogs.confirm(confirmation.message, {
+          variant: "default",
+        })) ?? false;
+        if (!confirmed) {
+          scheduleComposerFocus();
+          return;
+        }
+        stopThreadSessionCommand({
+          environmentId: activeThread.environmentId,
+          input: { threadId: activeThread.id },
+        });
+      }
       setComposerDraftModelSelection(
         scopeThreadRef(activeThread.environmentId, activeThread.id),
         nextModelSelection,
@@ -5966,6 +5999,7 @@ function ChatViewContent(props: ChatViewProps) {
       setStickyComposerModelSelection,
       providerStatuses,
       settings,
+      stopThreadSessionCommand,
     ],
   );
   const onEnvModeChange = useCallback(
