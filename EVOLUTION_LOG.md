@@ -100,3 +100,9 @@ What worked + evidence: (1) The gate rule blocked PR #60's first merge attempt �
 What failed + evidence: **one direct push to main** (`651ead01`) — skipped branch-before-commit under momentum and `git push -q` shipped main. Self-caught within one command; breach visible in history; logged here rather than history-scrubbed. Lesson as reusable rule: **the branch command precedes the first commit of every unit — no exceptions for docs; a breach is logged, not erased.**
 
 Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-out (#61).
+
+## 2026-09-18 — session (#63, #65, #66)
+- **Tried**: docs sweep (#32), landing page (#33), runner-string issue (#64). **Worked**: evidence-first triage kept `usage.md` alive (UsageService really scans codex/claude transcripts) while killing 7 upstream-only docs; CodeRabbit arbitrated findings produced real fixes (service.ts strings, clipboard success-only announcement). **Lesson (reusable)**: a bot review is free hostile-senior review — verify each finding against code, then fix the valid ones at the source, not the symptom.
+- **Repeated mistake caught**: committed straight to `main` again (2nd time). Correction executed properly this time (branch carried the commit, main reset to origin, PR loop completed). **Rule**: `git checkout -b` BEFORE the first edit of any task, not before the commit — the branch is the unit of work, not the commit.
+- **Issue-premise corrections**: #32's "five providers" claims were real upstream residue (fixed), but #64's "runner detection strings" were already package-agnostic — the real bug was `pinnedRuntime` installing upstream `t3@` from npm. **Lesson**: an issue names a symptom; the evidence pass names the bug.
+- **Graph**: updated in every PR (#63, #65, #66 rows). Nodes: pinned-runtime contract, /welcome route, docs tree fork-reality.
