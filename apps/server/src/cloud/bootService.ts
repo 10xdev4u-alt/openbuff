@@ -25,7 +25,9 @@ import {
   type ServiceState,
 } from "./serviceProtocol.ts";
 
-const BOOT_SERVICE_NAME = "t3code";
+const BOOT_SERVICE_NAME = "openbuff";
+/** Upstream-era unit name; still cleaned up so old installs do not linger. */
+export const BOOT_SERVICE_LEGACY_UNIT_FILE = "t3code.service";
 export const BOOT_SERVICE_UNIT_FILE = `${BOOT_SERVICE_NAME}.service`;
 export const BOOT_SERVICE_UNIT_ENV = "T3_BOOT_SERVICE_UNIT";
 
@@ -171,6 +173,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
 
   const unitDir = path.join(homeDir, ".config", "systemd", "user");
   const unitPath = path.join(unitDir, BOOT_SERVICE_UNIT_FILE);
+  const legacyUnitPath = path.join(unitDir, BOOT_SERVICE_LEGACY_UNIT_FILE);
   const logPath = path.join(input.logsDir, "boot-service.log");
   const launcherPath = path.join(input.baseDir, "runtime", SERVICE_LAUNCHER_FILE);
   const statePath = path.join(input.baseDir, "runtime", SERVICE_STATE_FILE);
@@ -305,6 +308,31 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
       ]);
     }
 
+    // Legacy-unit migration (issue #67): installs from before the openbuff
+    // rename carry a live `t3code.service`. Disable and remove it *before*
+    // the new unit starts, so boot never runs both launchers. Strict, like
+    // every other step: if the legacy stop fails, aborting with the legacy
+    // unit intact beats removing the file and letting an unstoppable launcher
+    // race the new one (CodeRabbit Major, #69).
+    const legacyUnitExists = yield* fs
+      .exists(legacyUnitPath)
+      .pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
+    if (legacyUnitExists) {
+      yield* runStep("disabling the legacy t3code service", "systemctl", [
+        "--user",
+        "disable",
+        "--now",
+        BOOT_SERVICE_LEGACY_UNIT_FILE,
+      ]);
+      yield* fs
+        .remove(legacyUnitPath)
+        .pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
+      yield* runStep("reloading systemd user units after legacy removal", "systemctl", [
+        "--user",
+        "daemon-reload",
+      ]);
+    }
+
     yield* Effect.gen(function* () {
       if (installed) {
         const previousStateText = yield* fs.readFileString(statePath).pipe(Effect.option);
@@ -359,24 +387,39 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
     );
     return plan;
   }).pipe(Effect.withSpan("cloud.boot_service.install"));
-
   const uninstall: BootService["Service"]["uninstall"] = Effect.gen(function* () {
     yield* requireSystemdLinux;
-    if (
-      !(yield* fs
-        .exists(unitPath)
-        .pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause }))))
-    )
-      return false;
-    yield* runStep("stopping the service", "systemctl", [
-      "--user",
-      "disable",
-      "--now",
-      BOOT_SERVICE_UNIT_FILE,
-    ]);
-    yield* fs
-      .remove(unitPath)
+    // Both eras are cleaned: the current unit and any legacy `t3code.service`
+    // a pre-rename install left behind (issue #67).
+    const currentInstalled = yield* fs
+      .exists(unitPath)
       .pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
+    const legacyInstalled = yield* fs
+      .exists(legacyUnitPath)
+      .pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
+    if (!currentInstalled && !legacyInstalled) return false;
+    if (currentInstalled) {
+      yield* runStep("stopping the service", "systemctl", [
+        "--user",
+        "disable",
+        "--now",
+        BOOT_SERVICE_UNIT_FILE,
+      ]);
+      yield* fs
+        .remove(unitPath)
+        .pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
+    }
+    if (legacyInstalled) {
+      yield* runStep("stopping the legacy t3code service", "systemctl", [
+        "--user",
+        "disable",
+        "--now",
+        BOOT_SERVICE_LEGACY_UNIT_FILE,
+      ]);
+      yield* fs
+        .remove(legacyUnitPath)
+        .pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
+    }
     yield* runStep("reloading systemd user units", "systemctl", ["--user", "daemon-reload"]);
     return true;
   }).pipe(Effect.withSpan("cloud.boot_service.uninstall"));
