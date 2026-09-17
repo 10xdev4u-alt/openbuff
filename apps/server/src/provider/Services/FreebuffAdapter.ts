@@ -23,9 +23,11 @@
  * conversation rewind; checkpoint-revert at the orchestration layer is the
  * real path — see issue #8).
  *
- * `respondToRequest` / `respondToUserInput` validate the session but cannot
- * yet reach into a running SDK turn; interactive approvals arrive with the
- * `overrideTools` interception in issue #4.
+ * `respondToRequest` resolves parked command approvals: the driver's
+ * `overrideTools` interception (issue #4) parks each approval on a promise the
+ * web UI settles through this call; an `acceptForSession` decision flips the
+ * session to run later commands unasked. `respondToUserInput` only validates
+ * the session — user-input resumes are not wired yet.
  *
  * @module provider/Services/FreebuffAdapter
  */
