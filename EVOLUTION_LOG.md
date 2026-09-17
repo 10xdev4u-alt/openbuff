@@ -91,3 +91,12 @@ What I tried: review-then-merge batching on docs PRs #57/#58 with Tests still pe
 What worked/failed + evidence: both verified all-SUCCESS post-merge, but the process rule broke twice more; counter 2→4.
 Lesson as reusable rule (workflow change, per charter): **the merge command MUST be a separate tool call that starts with an explicit gate check** — `gh pr checks <n> | grep -c "^Build.*pass"` etc. must equal the expected gate count in the SAME command, immediately before `gh pr merge`. No docs-only exemption: the check is one grep, cheaper than the verification debt it prevents.
 Graph nodes updated: none needed beyond task-log rows already merged.
+## 2026-09-17 — process lessons, lock-in lap 2
+
+What I tried: the lock-in lap plan (#55 server half → #55 web half → docs sweep → landing page) with the merge-gate rule active; a docs round via the graph task log; a process correction after one charter breach.
+
+What worked + evidence: (1) The gate rule blocked PR #60's first merge attempt — CI caught a **time bomb I planted myself** (cockpit test fixture hardcoded `resetAt: 2026-09-17T07:00Z`, written the day before; the clock expired it). Fix: clock-relative fixtures; lesson — *never hardcode absolute timestamps in fixtures when the SUT reads the wall clock; derive from Date.now().* (2) CodeRabbit Majors on #60 were both valid: replacement race in `stopSession` (guard `sessions.get(threadId) === state` before delete) and unbounded DELETE (bound via `AbortSignal.timeout` + signal-abort race — a signal alone cannot bound a fetch that ignores it; covered by a never-settling injected fetch). (3) Effect 4 gotchas banked: `Effect.andThen(effect, callback)` rejects a callback returning undefined ("Not a valid effect"); `Effect.promise` rejects as defect → needs `Effect.ignoreCause`, not `Effect.ignore`.
+
+What failed + evidence: **one direct push to main** (`651ead01`) — skipped branch-before-commit under momentum and `git push -q` shipped main. Self-caught within one command; breach visible in history; logged here rather than history-scrubbed. Lesson as reusable rule: **the branch command precedes the first commit of every unit — no exceptions for docs; a breach is logged, not erased.**
+
+Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-out (#61).
