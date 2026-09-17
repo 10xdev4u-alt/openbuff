@@ -25,16 +25,17 @@ const FACTS: ReadonlyArray<{ readonly title: string; readonly body: string }> = 
 ];
 
 function CopyCommandChip() {
+  // The success announcement fires from `onCopy` only: the clipboard write is
+  // async and can be denied, so announcing in the click handler would claim
+  // success for a failed copy (CodeRabbit, #65).
+  const [announced, setAnnounced] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard({
     target: "start command",
+    onCopy: () => {
+      setAnnounced(true);
+      window.setTimeout(() => setAnnounced(false), 2000);
+    },
   });
-  const [announced, setAnnounced] = useState(false);
-
-  const handleCopy = () => {
-    copyToClipboard(START_COMMAND);
-    setAnnounced(true);
-    window.setTimeout(() => setAnnounced(false), 2000);
-  };
 
   return (
     <div className="inline-flex items-center gap-1 rounded-[--radius-md] border border-border bg-muted/40 py-1.5 pr-1.5 pl-4 font-mono text-sm">
@@ -44,7 +45,7 @@ function CopyCommandChip() {
         size="sm"
         className="size-8 p-0"
         aria-label="Copy command"
-        onClick={handleCopy}
+        onClick={() => copyToClipboard(START_COMMAND)}
       >
         {isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
       </Button>
@@ -99,9 +100,7 @@ export function OpenBuffLanding() {
         <section className="grid gap-8 sm:grid-cols-3">
           {FACTS.map((fact) => (
             <div key={fact.title} className="flex flex-col gap-2">
-              <h2 className="font-display text-sm font-semibold tracking-wide">
-                {fact.title}
-              </h2>
+              <h2 className="font-display text-sm font-semibold tracking-wide">{fact.title}</h2>
               <p className="text-muted-foreground text-sm leading-relaxed">{fact.body}</p>
             </div>
           ))}
@@ -116,8 +115,8 @@ export function OpenBuffLanding() {
             >
               rjwarrier/yata
             </a>
-            . Type set in Inter Tight, Inter, JetBrains Mono, and Bodoni Moda (SIL OFL, self-hosted).
-            Forked from{" "}
+            . Type set in Inter Tight, Inter, JetBrains Mono, and Bodoni Moda (SIL OFL,
+            self-hosted). Forked from{" "}
             <a
               href="https://github.com/pingdotgg/t3code"
               className="underline underline-offset-4 hover:text-foreground"
