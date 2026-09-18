@@ -101,6 +101,12 @@ What failed + evidence: **one direct push to main** (`651ead01`) — skipped bra
 
 Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-out (#61).
 
+## 2026-09-18 — session (#73, #74)
+- **Tried**: legacy-unit status surfacing (#71→#73) and welcome head metadata (#72→#74). **Worked**: both arcs ran issue→RED→GREEN→gate→review→merge with zero rework once the gate lesson landed. **Failed once**: shipped PR #73 without running the local `typecheck` — CI round-1 caught a real arity bug (`formatServiceStatus` called with 1 arg) that runtime tests missed because the assertions never touched the version line. Fixed at source, and typecheck ran locally before every subsequent push. **Lesson (reusable)**: `vp test` green ≠ compiles; the merge-gate simulation is typecheck + tests + fmt, ALL locally, before `git push` — CI is the audit, not the first line of defense.
+- **CodeRabbit arbitration**: two Minors on #73 were both valid (legacy-only status printed the *new* unit path that doesn't exist; a non-Linux special-case contradicted AC1's "every platform") — fixed by adding `legacyUnitPath` to the status contract and deleting the branch. **Lesson**: an over-fitted conditional is usually a missing data field in disguise.
+- **#72 honesty guard**: head metadata shipped *without* `og:image` because no asset exists (verified `apps/web/public/`) — a 404 preview is worse than none. Follow-up raised with design ACs.
+- **Graph**: rows added for #71 and #72. Nodes: BootServiceStatus.legacyInstalled/legacyUnitPath, welcomeHead data contract.
+
 ## 2026-09-18 — session (#63, #65, #66)
 - **Tried**: docs sweep (#32), landing page (#33), runner-string issue (#64). **Worked**: evidence-first triage kept `usage.md` alive (UsageService really scans codex/claude transcripts) while killing 7 upstream-only docs; CodeRabbit arbitrated findings produced real fixes (service.ts strings, clipboard success-only announcement). **Lesson (reusable)**: a bot review is free hostile-senior review — verify each finding against code, then fix the valid ones at the source, not the symptom.
 - **Repeated mistake caught**: committed straight to `main` again (2nd time). Correction executed properly this time (branch carried the commit, main reset to origin, PR loop completed). **Rule**: `git checkout -b` BEFORE the first edit of any task, not before the commit — the branch is the unit of work, not the commit.
