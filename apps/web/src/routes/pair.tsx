@@ -17,7 +17,8 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 export function pairHead() {
   return {
     meta: [
-      { name: "title", content: "OpenBuff — Pair with this environment" },
+      // { title } descriptor, not name:"title" — see __root.tsx for why.
+      { title: "OpenBuff — Pair with this environment" },
       {
         name: "description",
         content: "Pair this browser with an OpenBuff environment using a one-time pairing token.",

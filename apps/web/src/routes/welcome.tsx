@@ -14,7 +14,8 @@ const OpenBuffLanding = lazy(() =>
  */
 export const welcomeHead = () => ({
   meta: [
-    { name: "title", content: "OpenBuff — the open web app for Freebuff" },
+    // { title } descriptor, not name:"title" — see __root.tsx for why.
+    { title: "OpenBuff — the open web app for Freebuff" },
     {
       name: "description",
       content:

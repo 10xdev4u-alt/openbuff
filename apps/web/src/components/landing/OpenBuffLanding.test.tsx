@@ -11,12 +11,10 @@ import { OpenBuffLanding } from "./OpenBuffLanding";
 describe("welcomeHead", () => {
   it("titles the page for the product", () => {
     const meta = welcomeHead().meta ?? [];
-    const title = meta.find(
-      (m) => m.name === "title" || ("property" in m && m.property === "og:title"),
-    );
-    expect(
-      meta.some((m) => "name" in m && m.name === "title" && m.content.includes("OpenBuff")),
-    ).toBe(true);
+    // { title } descriptor (not name:"title") is what the router renders as
+    // a real <title> element.
+    const title = meta.find((m) => "title" in m || ("property" in m && m.property === "og:title"));
+    expect(meta.some((m) => "title" in m && String(m.title).includes("OpenBuff"))).toBe(true);
     expect(title).toBeDefined();
   });
 
@@ -25,10 +23,10 @@ describe("welcomeHead", () => {
     const find = (key: string) =>
       meta.find((m) => ("name" in m && m.name === key) || ("property" in m && m.property === key));
     const description = find("description");
-    expect(description?.content).toContain("Freebuff");
-    expect(description?.content.length ?? 0).toBeGreaterThan(0);
-    expect(find("og:title")?.content).toContain("OpenBuff");
-    expect(find("og:description")?.content).toContain("Freebuff");
+    expect(String(description?.content)).toContain("Freebuff");
+    expect(String(description?.content).length).toBeGreaterThan(0);
+    expect(String(find("og:title")?.content)).toContain("OpenBuff");
+    expect(String(find("og:description")?.content)).toContain("Freebuff");
     expect(find("og:type")?.content).toBe("website");
     expect(find("og:title")).toBeDefined();
     expect(find("og:description")).toBeDefined();
