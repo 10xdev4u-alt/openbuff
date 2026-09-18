@@ -67,7 +67,8 @@ export function appRouteHead(key: AppRouteHeadKey) {
   const entry = appRouteHeads[key];
   return {
     meta: [
-      { name: "title", content: `${entry.title} — ${APP_DISPLAY_NAME}` },
+      // { title } descriptor, not name:"title" — see __root.tsx for why.
+      { title: `${entry.title} — ${APP_DISPLAY_NAME}` },
       { name: "description", content: entry.description },
     ],
   };

@@ -12,10 +12,12 @@ function findMeta(
 describe("pairHead", () => {
   it("titles the page for pairing", () => {
     const meta = pairHead().meta ?? [];
-    const title = findMeta(meta, "title");
+    // { title } descriptor (not name:"title") is what the router renders as
+    // a real <title> element.
+    const title = meta.find((m) => "title" in m);
     expect(title).toBeDefined();
-    expect(String(title?.content)).toContain("OpenBuff");
-    expect(String(title?.content).toLowerCase()).toContain("pair");
+    expect(String(title && "title" in title && title.title)).toContain("OpenBuff");
+    expect(String(title && "title" in title && title.title).toLowerCase()).toContain("pair");
   });
 
   it("carries an honest description and og tags", () => {

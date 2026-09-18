@@ -27,11 +27,15 @@ describe("appRouteHeads data", () => {
     const titles = new Set<string>();
     for (const key of LEAF_KEYS) {
       const { meta } = appRouteHead(key);
-      const title = meta.find((m) => m.name === "title");
+      // { title } descriptor is the ONLY form the router maps to a real
+      // <title> element (name:"title" would be a dead meta tag).
+      const title = meta.find((m) => "title" in m);
       const description = meta.find((m) => m.name === "description");
-      expect(title?.content, key).toBe(`${appRouteHeads[key].title} — ${APP_DISPLAY_NAME}`);
+      expect(title && "title" in title && title.title, key).toBe(
+        `${appRouteHeads[key].title} — ${APP_DISPLAY_NAME}`,
+      );
       expect(String(description?.content).length, key).toBeGreaterThanOrEqual(15);
-      titles.add(String(title?.content));
+      titles.add(String(title && "title" in title && title.title));
     }
     expect(titles.size).toBe(LEAF_KEYS.length);
   });

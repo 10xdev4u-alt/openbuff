@@ -83,7 +83,10 @@ export const Route = createRootRoute({
   component: RootRouteView,
   errorComponent: RootRouteErrorView,
   head: () => ({
-    meta: [{ name: "title", content: APP_DISPLAY_NAME }],
+    // { title } (not name:"title") — router-core maps only the `title`
+    // descriptor to a real <title> element; name:"title" renders a dead meta
+    // tag (verified in @tanstack/react-router headContentUtils.tsx).
+    meta: [{ title: APP_DISPLAY_NAME }],
   }),
 });
 
