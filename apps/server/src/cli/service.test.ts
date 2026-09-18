@@ -7,6 +7,7 @@ const status = {
   installed: true,
   current: true,
   legacyInstalled: false,
+  legacyUnitPath: "/home/me/.config/systemd/user/t3code.service",
   unitPath: "/home/me/.config/systemd/user/openbuff.service",
   logPath: "/home/me/.openbuff/userdata/logs/boot-service.log",
 } as const;
@@ -39,7 +40,7 @@ it("points t3-era operators at the migration when only the legacy unit exists", 
     [
       "OpenBuff service",
       "  Status: legacy t3code service detected",
-      "  Unit: /home/me/.config/systemd/user/openbuff.service",
+      "  Unit: /home/me/.config/systemd/user/t3code.service",
       "  Logs: /home/me/.openbuff/userdata/logs/boot-service.log",
       "  Next: Run `openbuff service install` to migrate it.",
     ].join("\n"),

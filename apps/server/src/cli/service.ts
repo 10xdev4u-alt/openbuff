@@ -56,7 +56,7 @@ export function formatServiceStatus(
       return [
         "OpenBuff service",
         "  Status: legacy t3code service detected",
-        `  Unit: ${status.unitPath}`,
+        `  Unit: ${status.legacyUnitPath}`,
         `  Logs: ${status.logPath}`,
         "  Next: Run `openbuff service install` to migrate it.",
       ].join("\n");
