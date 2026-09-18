@@ -138,6 +138,10 @@ export type BootServiceError =
 export interface BootServiceStatus {
   readonly supported: boolean;
   readonly installed: boolean;
+  /** True iff a pre-rename `t3code.service` unit file still exists (legacy era, #67). */
+  readonly legacyInstalled: boolean;
+  /** Path of the pre-rename unit (valid only when `legacyInstalled`). */
+  readonly legacyUnitPath: string;
   readonly current: boolean;
   readonly unitPath: string;
   readonly logPath: string;
@@ -425,11 +429,32 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
   }).pipe(Effect.withSpan("cloud.boot_service.uninstall"));
 
   const status: BootService["Service"]["status"] = Effect.gen(function* () {
+    // Read-only legacy check (issue #71): report the pre-rename unit without
+    // ever touching it — migration stays single-writer inside install().
+    // Unconditional (any platform): a pure fs.exists, false where systemd
+    // units cannot exist — no special case to maintain.
+    const legacyInstalled = yield* fs.exists(legacyUnitPath);
     if (platform !== "linux" || homeDir === "") {
-      return { supported: false, installed: false, current: false, unitPath, logPath };
+      return {
+        supported: false,
+        installed: false,
+        current: false,
+        legacyInstalled,
+        legacyUnitPath,
+        unitPath,
+        logPath,
+      };
     }
     if (!(yield* fs.exists(unitPath))) {
-      return { supported: true, installed: false, current: false, unitPath, logPath };
+      return {
+        supported: true,
+        installed: false,
+        current: false,
+        legacyInstalled,
+        legacyUnitPath,
+        unitPath,
+        logPath,
+      };
     }
     const [unit, launcherExists, runtimeEntryExists, runtimeSentinel, stateText] =
       yield* Effect.all([
@@ -451,6 +476,8 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
         runtimeSentinel.value.trim() === input.cliVersion &&
         state?.activeVersion === input.cliVersion &&
         state?.update?.status !== "pending",
+      legacyInstalled,
+      legacyUnitPath,
       unitPath,
       logPath,
     };

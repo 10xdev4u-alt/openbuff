@@ -17,6 +17,11 @@ Check whether it is installed:
 npx openbuff@latest service status
 ```
 
+The status output names its systemd unit. On machines upgraded from the T3 era it can also detect
+a leftover `t3code.service`: if only that legacy unit exists, the status says so and points at
+`service install` to migrate it; if both units exist, it flags the leftover so you can remove it
+with `service uninstall`.
+
 Update or repair it:
 
 ```sh

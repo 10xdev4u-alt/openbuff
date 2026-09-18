@@ -51,6 +51,16 @@ export function formatServiceStatus(
     return "OpenBuff service\n  Status: unavailable on this machine\n  Supported on: Linux with systemd";
   }
   if (!status.installed) {
+    if (status.legacyInstalled) {
+      // t3-era machine (#71): the pre-rename unit is live and we never migrated.
+      return [
+        "OpenBuff service",
+        "  Status: legacy t3code service detected",
+        `  Unit: ${status.legacyUnitPath}`,
+        `  Logs: ${status.logPath}`,
+        "  Next: Run `openbuff service install` to migrate it.",
+      ].join("\n");
+    }
     return "OpenBuff service\n  Status: not installed\n  Next: Run `openbuff service install`.";
   }
   return [
@@ -58,6 +68,11 @@ export function formatServiceStatus(
     `  Status: ${status.current ? `installed · openbuff@${cliVersion}` : "needs an update or repair"}`,
     `  Unit: ${status.unitPath}`,
     `  Logs: ${status.logPath}`,
+    ...(status.legacyInstalled
+      ? [
+          "  Note: Legacy t3code.service also present — remove it with `openbuff service uninstall`.",
+        ]
+      : []),
     ...(status.current ? [] : ["  Next: Run `npx openbuff@latest service update`."]),
   ].join("\n");
 }
