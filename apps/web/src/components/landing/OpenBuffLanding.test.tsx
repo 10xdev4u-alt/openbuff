@@ -1,7 +1,47 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vite-plus/test";
 
+import { welcomeHead } from "../../routes/welcome";
 import { OpenBuffLanding } from "./OpenBuffLanding";
+
+/**
+ * Head metadata (issue #72) is asserted as pure route data — renderToStaticMarkup
+ * cannot observe TanStack's document-head layer, so the data contract is the seam.
+ */
+describe("welcomeHead", () => {
+  it("titles the page for the product", () => {
+    const meta = welcomeHead().meta ?? [];
+    const title = meta.find((m) => m.name === "title" || "property" in m && m.property === "og:title");
+    expect(meta.some((m) => "name" in m && m.name === "title" && m.content.includes("OpenBuff"))).toBe(
+      true,
+    );
+    expect(title).toBeDefined();
+  });
+
+  it("carries an honest description and og tags", () => {
+    const meta = welcomeHead().meta ?? [];
+    const find = (key: string) => meta.find((m) => "name" in m && m.name === key || "property" in m && m.property === key);
+    const description = find("description");
+    expect(description?.content).toContain("Freebuff");
+    expect(description?.content.length ?? 0).toBeGreaterThan(0);
+    expect(find("og:title")?.content).toContain("OpenBuff");
+    expect(find("og:description")?.content).toContain("Freebuff");
+    expect(find("og:type")?.content).toBe("website");
+    expect(find("og:title")).toBeDefined();
+    expect(find("og:description")).toBeDefined();
+    expect(find("og:type")).toBeDefined();
+    // AC3: no og:image until a real asset exists — a 404 preview is worse than none.
+    expect(find("og:image")).toBeUndefined();
+  });
+
+  it("uses no words on the unslop list", () => {
+    const meta = welcomeHead().meta ?? [];
+    const text = meta.map((m) => m.content).join(" ").toLowerCase();
+    for (const word of ["revolutionize", "game-changing", "fast-paced", "blazing", "seamless"]) {
+      expect(text).not.toContain(word);
+    }
+  });
+});
 
 describe("OpenBuffLanding", () => {
   it("renders the Bodoni hero headline and a concrete subhead", () => {
