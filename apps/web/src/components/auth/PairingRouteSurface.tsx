@@ -14,6 +14,8 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { useAtomCommand } from "../../state/use-atom-command";
 
+import { PairingAlert, PairingStatus, busyAttribute } from "./PairingAlert";
+
 export function PairingPendingSurface() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10 text-foreground sm:px-6">
@@ -67,6 +69,7 @@ export function PairingRouteSurface({
 
       if (submitError) {
         setErrorMessage(submitError);
+        tokenInputRef.current?.focus();
         return;
       }
 
@@ -76,6 +79,8 @@ export function PairingRouteSurface({
     },
     [onAuthenticated],
   );
+
+  const tokenInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = useCallback(
     async (event?: React.SubmitEvent<HTMLFormElement>) => {
@@ -122,6 +127,7 @@ export function PairingRouteSurface({
             </label>
             <Input
               id="pairing-token"
+              autoFocus
               autoCapitalize="none"
               autoComplete="off"
               autoCorrect="off"
@@ -129,19 +135,18 @@ export function PairingRouteSurface({
               nativeInput
               onChange={(event) => setCredential(event.currentTarget.value)}
               placeholder="Paste a one-time token or pairing secret"
+              ref={tokenInputRef}
               spellCheck={false}
               value={credential}
             />
           </div>
 
           {errorMessage ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/6 px-3 py-2 text-sm text-destructive">
-              {errorMessage}
-            </div>
+            <PairingAlert message={errorMessage} />
           ) : null}
 
           <div className="flex flex-wrap gap-2">
-            <Button disabled={isSubmitting} size="sm" type="submit">
+            <Button disabled={isSubmitting} size="sm" type="submit" {...busyAttribute(isSubmitting)}>
               {isSubmitting ? "Pairing..." : "Continue"}
             </Button>
             <Button
@@ -251,7 +256,7 @@ export function HostedPairingRouteSurface() {
               ? "Pairing failed"
               : "Pairing backend"}
         </h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{message}</p>
+        <PairingStatus className="mt-2" message={message} />
 
         {request ? (
           <div className="mt-5 rounded-lg border border-border/70 bg-background/55 px-3 py-3 text-xs leading-relaxed text-muted-foreground">
@@ -260,15 +265,12 @@ export function HostedPairingRouteSurface() {
         ) : null}
 
         {status === "error" ? (
-          <div className="mt-5 rounded-lg border border-destructive/30 bg-destructive/6 px-3 py-2 text-sm text-destructive">
-            Verify the backend is reachable from this browser, supports CORS for hosted clients, and
-            is served over HTTPS when opening this page from HTTPS.
-          </div>
+          <PairingAlert className="mt-5" message={hostedStaticGuidance()} />
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-2">
           {status === "pairing" ? (
-            <Button disabled size="sm">
+            <Button disabled size="sm" {...busyAttribute(true)}>
               Pairing...
             </Button>
           ) : canRetry ? (
@@ -277,7 +279,7 @@ export function HostedPairingRouteSurface() {
             </Button>
           ) : null}
           {status === "paired" ? (
-            <Button size="sm" variant="outline" onClick={() => (window.location.href = "/")}>
+            <Button size="sm" variant="outline" {...busyAttribute(false)} onClick={() => (window.location.href = "/")}>
               Open app
             </Button>
           ) : null}
@@ -285,6 +287,10 @@ export function HostedPairingRouteSurface() {
       </section>
     </div>
   );
+}
+
+function hostedStaticGuidance(): string {
+  return "Verify the backend is reachable from this browser, supports CORS for hosted clients, and is served over HTTPS when opening this page from HTTPS.";
 }
 
 function errorMessageFromUnknown(error: unknown): string {
