@@ -11,16 +11,19 @@ import { OpenBuffLanding } from "./OpenBuffLanding";
 describe("welcomeHead", () => {
   it("titles the page for the product", () => {
     const meta = welcomeHead().meta ?? [];
-    const title = meta.find((m) => m.name === "title" || "property" in m && m.property === "og:title");
-    expect(meta.some((m) => "name" in m && m.name === "title" && m.content.includes("OpenBuff"))).toBe(
-      true,
+    const title = meta.find(
+      (m) => m.name === "title" || ("property" in m && m.property === "og:title"),
     );
+    expect(
+      meta.some((m) => "name" in m && m.name === "title" && m.content.includes("OpenBuff")),
+    ).toBe(true);
     expect(title).toBeDefined();
   });
 
   it("carries an honest description and og tags", () => {
     const meta = welcomeHead().meta ?? [];
-    const find = (key: string) => meta.find((m) => "name" in m && m.name === key || "property" in m && m.property === key);
+    const find = (key: string) =>
+      meta.find((m) => ("name" in m && m.name === key) || ("property" in m && m.property === key));
     const description = find("description");
     expect(description?.content).toContain("Freebuff");
     expect(description?.content.length ?? 0).toBeGreaterThan(0);
@@ -30,13 +33,17 @@ describe("welcomeHead", () => {
     expect(find("og:title")).toBeDefined();
     expect(find("og:description")).toBeDefined();
     expect(find("og:type")).toBeDefined();
-    // AC3: no og:image until a real asset exists — a 404 preview is worse than none.
-    expect(find("og:image")).toBeUndefined();
+    // og:image points at the real bundled asset. Root-relative on purpose: this
+    // app has no fixed production origin, and an absolute guess would 404.
+    expect(find("og:image")?.content).toBe("/og.png");
   });
 
   it("uses no words on the unslop list", () => {
     const meta = welcomeHead().meta ?? [];
-    const text = meta.map((m) => m.content).join(" ").toLowerCase();
+    const text = meta
+      .map((m) => m.content)
+      .join(" ")
+      .toLowerCase();
     for (const word of ["revolutionize", "game-changing", "fast-paced", "blazing", "seamless"]) {
       expect(text).not.toContain(word);
     }
