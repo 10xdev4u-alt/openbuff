@@ -11,6 +11,7 @@ import { HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/u
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { installEnvironmentHttpTest } from "../test/environmentHttpTest";
+import { setCredentialExchangeDeadlineMsForTests } from "./environments/primary/auth";
 import { __setPrimaryHttpRunnerForTests, type PrimaryHttpEffectRunner } from "./lib/runtime";
 
 type TestWindow = {
@@ -328,6 +329,32 @@ describe("resolveInitialServerAuthGateState", () => {
     // initial check + one poll in the post-exchange wait loop; the
     // authenticated result is cached, so no third fetch happens.
     expect(testApi.calls.session).toBe(2);
+  });
+
+  it("fails the pairing exchange with a typed error when the backend never responds", async () => {
+    // A hung fetch (dropped connection without RST, stalled proxy) must hit a
+    // client-side deadline and fail typed — never settle the form forever.
+    // The handler never returns, so only the deadline can end the exchange.
+    const testApi = await installAuthApi({
+      browserSession: () => Effect.never,
+    });
+    const previousDeadline = setCredentialExchangeDeadlineMsForTests(50);
+    const { isPrimaryEnvironmentRequestDeadlineError, submitServerAuthCredential } = await import(
+      "./environments/primary/auth"
+    );
+
+    try {
+      const error = await submitServerAuthCredential("hung-token").then(
+        () => null,
+        (failure: unknown) => failure,
+      );
+
+      expect(isPrimaryEnvironmentRequestDeadlineError(error)).toBe(true);
+      expect(error).toMatchObject({ deadlineMs: 50 });
+      expect(testApi.calls.browserSession).toEqual([{ credential: "hung-token" }]);
+    } finally {
+      setCredentialExchangeDeadlineMsForTests(previousDeadline);
+    }
   });
 
   it("rejects a blank pairing token with a structured validation error", async () => {
