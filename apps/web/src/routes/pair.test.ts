@@ -27,6 +27,7 @@ describe("pairHead", () => {
     expect(find("og:title")).toBeDefined();
     expect(find("og:description")).toBeDefined();
     expect(find("og:type")?.content).toBe("website");
+    expect(find("og:image")?.content).toBe("/og.png");
   });
 
   it("uses no words on the unslop list", () => {
