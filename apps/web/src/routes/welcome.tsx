@@ -6,9 +6,11 @@ const OpenBuffLanding = lazy(() =>
 );
 
 /**
- * Document-head metadata for the landing (issue #72). Copy mirrors the README's
- * own description of the product — no invented claims. og:image is deliberately
- * absent until a real preview asset exists; a 404 image is worse than none.
+ * Document-head metadata for the landing (issues #72, #75). Copy mirrors the
+ * README's own description of the product — no invented claims. og:image is
+ * root-relative on purpose: this app has no fixed production origin, and an
+ * absolute guess would 404. Asset + generator: apps/web/public/og.png,
+ * scripts/generate-og-image.mjs.
  */
 export const welcomeHead = () => ({
   meta: [
@@ -25,6 +27,7 @@ export const welcomeHead = () => ({
         "A local-first, ad-free web experience for the Freebuff AI coding agent, running on your machine.",
     },
     { property: "og:type", content: "website" },
+    { property: "og:image", content: "/og.png" },
   ],
 });
 
