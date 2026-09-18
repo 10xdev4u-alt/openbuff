@@ -10,7 +10,9 @@ import type {
 import { EnvironmentHttpCommonError, PRIMARY_LOCAL_ENVIRONMENT_ID } from "@t3tools/contracts";
 import type { EnvironmentHttpCommonError as EnvironmentHttpCommonErrorType } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { HttpClientError } from "effect/unstable/http";
 
@@ -228,15 +230,78 @@ function readEnvironmentHttpErrorStatus(error: EnvironmentHttpCommonErrorType): 
   }
 }
 
+export class PrimaryEnvironmentRequestDeadlineError extends Schema.TaggedErrorClass<PrimaryEnvironmentRequestDeadlineError>()(
+  "PrimaryEnvironmentRequestDeadlineError",
+  {
+    operation: PrimaryEnvironmentRequestOperation,
+    deadlineMs: Schema.Number,
+  },
+) {
+  override get message(): string {
+    return `The environment did not respond within ${this.deadlineMs}ms during ${this.operation}. Check that the server is reachable, then try again.`;
+  }
+}
+
+export const isPrimaryEnvironmentRequestDeadlineError = Schema.is(
+  PrimaryEnvironmentRequestDeadlineError,
+);
+
+const CREDENTIAL_EXCHANGE_DEADLINE_MS = 30_000;
+
+/**
+ * Test seam for the credential-exchange deadline. Returns the previous value.
+ * Production always uses CREDENTIAL_EXCHANGE_DEADLINE_MS.
+ */
+export function setCredentialExchangeDeadlineMsForTests(deadlineMs: number): number {
+  const previous = __credentialExchangeDeadlineMs;
+  __credentialExchangeDeadlineMs = deadlineMs;
+  return previous;
+}
+
+let __credentialExchangeDeadlineMs: number = CREDENTIAL_EXCHANGE_DEADLINE_MS;
+
+/**
+ * Client-side deadline for a single exchange attempt (issue #84).
+ *
+ * `retryTransientBootstrap` re-runs attempts that *error*, but a fetch that
+ * never settles (hung backend, dropped connection without RST) would block the
+ * pairing form forever — the retry loop never sees a failure. The same
+ * `Effect.timeoutOption` pattern client-runtime's auth module uses aborts the
+ * underlying fiber (Effect's FetchHttpClient wires the fiber signal into real
+ * fetch), so the hung socket is actually abandoned, then fails typed.
+ */
+const withCredentialExchangeDeadline = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E | PrimaryEnvironmentRequestDeadlineError, R> =>
+  Effect.timeoutOption(effect, Duration.millis(__credentialExchangeDeadlineMs)).pipe(
+    Effect.flatMap(
+      Option.match({
+        onNone: () =>
+          new PrimaryEnvironmentRequestDeadlineError({
+            operation: "exchange-bootstrap-credential",
+            deadlineMs: __credentialExchangeDeadlineMs,
+          }),
+        onSome: Effect.succeed,
+      }),
+    ),
+  );
+
 async function exchangeBootstrapCredential(credential: string): Promise<AuthBrowserSessionResult> {
   return retryTransientBootstrap(async () => {
     try {
       return await runPrimaryHttp(
-        PrimaryEnvironmentHttpClient.pipe(
-          Effect.flatMap((client) => client.auth.browserSession({ payload: { credential } })),
+        withCredentialExchangeDeadline(
+          PrimaryEnvironmentHttpClient.pipe(
+            Effect.flatMap((client) => client.auth.browserSession({ payload: { credential } })),
+          ),
         ),
       );
     } catch (error) {
+      if (isPrimaryEnvironmentRequestDeadlineError(error)) {
+        // Fail typed — never double-wrap the deadline into a generic request
+        // error, and never let the retry loop treat it as transient.
+        throw error;
+      }
       if (
         isEnvironmentHttpCommonError(error) &&
         error._tag === "EnvironmentAuthInvalidError" &&
