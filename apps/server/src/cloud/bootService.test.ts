@@ -221,6 +221,45 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
     }),
   );
 
+  it.effect("status reports a legacy-only install without touching it", () =>
+    Effect.gen(function* () {
+      const { service, fs, path, home } = yield* makeHarness();
+      const legacyUnitPath = path.join(home, ".config", "systemd", "user", "t3code.service");
+      yield* fs.makeDirectory(path.dirname(legacyUnitPath), { recursive: true });
+      yield* fs.writeFileString(legacyUnitPath, "[Unit]\nDescription=legacy install\n");
+
+      const status = yield* service.status;
+      expect(status.installed).toBe(false);
+      expect(status.legacyInstalled).toBe(true);
+      expect(yield* fs.exists(legacyUnitPath)).toBe(true);
+    }),
+  );
+
+  it.effect("status flags residue when a legacy unit reappears beside the new one", () =>
+    Effect.gen(function* () {
+      const { service, fs, path, home } = yield* makeHarness();
+      const legacyUnitPath = path.join(home, ".config", "systemd", "user", "t3code.service");
+
+      yield* service.install;
+      yield* fs.makeDirectory(path.dirname(legacyUnitPath), { recursive: true });
+      yield* fs.writeFileString(legacyUnitPath, "[Unit]\nDescription=out-of-band legacy install\n");
+
+      const status = yield* service.status;
+      expect(status.installed).toBe(true);
+      expect(status.legacyInstalled).toBe(true);
+    }),
+  );
+
+  it.effect("status reports no units installed on a clean machine", () =>
+    Effect.gen(function* () {
+      const { service } = yield* makeHarness();
+
+      const status = yield* service.status;
+      expect(status.installed).toBe(false);
+      expect(status.legacyInstalled).toBe(false);
+    }),
+  );
+
   it.effect("uninstall removes a legacy unit left behind", () =>
     Effect.gen(function* () {
       const { service, fs, path, commands, home } = yield* makeHarness();
@@ -246,7 +285,9 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
       // Fail closed: the legacy unit stays (still stoppable on the next
       // attempt) and the new unit never starts alongside it.
       expect(yield* fs.exists(legacyUnitPath)).toBe(true);
-      expect(yield* fs.exists(path.join(home, ".config", "systemd", "user", "openbuff.service"))).toBe(false);
+      expect(
+        yield* fs.exists(path.join(home, ".config", "systemd", "user", "openbuff.service")),
+      ).toBe(false);
     }),
   );
 });

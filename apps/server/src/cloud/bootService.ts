@@ -138,6 +138,8 @@ export type BootServiceError =
 export interface BootServiceStatus {
   readonly supported: boolean;
   readonly installed: boolean;
+  /** True iff a pre-rename `t3code.service` unit file still exists (legacy era, #67). */
+  readonly legacyInstalled: boolean;
   readonly current: boolean;
   readonly unitPath: string;
   readonly logPath: string;
@@ -425,11 +427,29 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
   }).pipe(Effect.withSpan("cloud.boot_service.uninstall"));
 
   const status: BootService["Service"]["status"] = Effect.gen(function* () {
+    // Read-only legacy check (issue #71): report the pre-rename unit without
+    // ever touching it — migration stays single-writer inside install().
+    const legacyInstalled =
+      platform === "linux" && homeDir !== "" ? yield* fs.exists(legacyUnitPath) : false;
     if (platform !== "linux" || homeDir === "") {
-      return { supported: false, installed: false, current: false, unitPath, logPath };
+      return {
+        supported: false,
+        installed: false,
+        current: false,
+        legacyInstalled,
+        unitPath,
+        logPath,
+      };
     }
     if (!(yield* fs.exists(unitPath))) {
-      return { supported: true, installed: false, current: false, unitPath, logPath };
+      return {
+        supported: true,
+        installed: false,
+        current: false,
+        legacyInstalled,
+        unitPath,
+        logPath,
+      };
     }
     const [unit, launcherExists, runtimeEntryExists, runtimeSentinel, stateText] =
       yield* Effect.all([
@@ -451,6 +471,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
         runtimeSentinel.value.trim() === input.cliVersion &&
         state?.activeVersion === input.cliVersion &&
         state?.update?.status !== "pending",
+      legacyInstalled,
       unitPath,
       logPath,
     };
