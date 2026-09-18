@@ -32,7 +32,10 @@ it("gives a direct repair command for a stale service", () => {
 
 it("points t3-era operators at the migration when only the legacy unit exists", () => {
   assert.equal(
-    formatServiceStatus({ ...status, installed: false, current: false, legacyInstalled: true }),
+    formatServiceStatus(
+      { ...status, installed: false, current: false, legacyInstalled: true },
+      "0.0.29",
+    ),
     [
       "OpenBuff service",
       "  Status: legacy t3code service detected",
@@ -45,11 +48,11 @@ it("points t3-era operators at the migration when only the legacy unit exists", 
 
 it("flags residue when a legacy unit survives beside the installed one", () => {
   assert.include(
-    formatServiceStatus({ ...status, legacyInstalled: true }),
+    formatServiceStatus({ ...status, legacyInstalled: true }, "0.0.29"),
     "Legacy t3code.service also present",
   );
   assert.include(
-    formatServiceStatus({ ...status, legacyInstalled: true }),
+    formatServiceStatus({ ...status, legacyInstalled: true }, "0.0.29"),
     "`openbuff service uninstall`",
   );
 });
