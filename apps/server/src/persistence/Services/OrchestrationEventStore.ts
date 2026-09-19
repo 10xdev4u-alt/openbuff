@@ -68,4 +68,4 @@ export interface OrchestrationEventStoreShape {
 export class OrchestrationEventStore extends Context.Service<
   OrchestrationEventStore,
   OrchestrationEventStoreShape
->()("openbuff/persistence/Services/OrchestrationEventStore") {}
+>()("@princetheprogrammerbtw/openbuff/persistence/Services/OrchestrationEventStore") {}

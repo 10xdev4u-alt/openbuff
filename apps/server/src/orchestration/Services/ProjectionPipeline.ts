@@ -39,4 +39,6 @@ export interface OrchestrationProjectionPipelineShape {
 export class OrchestrationProjectionPipeline extends Context.Service<
   OrchestrationProjectionPipeline,
   OrchestrationProjectionPipelineShape
->()("openbuff/orchestration/Services/ProjectionPipeline/OrchestrationProjectionPipeline") {}
+>()(
+  "@princetheprogrammerbtw/openbuff/orchestration/Services/ProjectionPipeline/OrchestrationProjectionPipeline",
+) {}

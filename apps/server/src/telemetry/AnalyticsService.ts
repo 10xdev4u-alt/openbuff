@@ -55,7 +55,7 @@ export class AnalyticsService extends Context.Service<
     /** Flush all currently queued telemetry events. */
     readonly flush: Effect.Effect<void>;
   }
->()("openbuff/telemetry/AnalyticsService") {
+>()("@princetheprogrammerbtw/openbuff/telemetry/AnalyticsService") {
   /** No-op layer for callers that intentionally disable telemetry. */
   static readonly layerTest = Layer.succeed(
     AnalyticsService,

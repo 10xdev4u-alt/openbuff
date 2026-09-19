@@ -60,7 +60,7 @@ export class ResourceMonitorBinary extends Context.Service<
   {
     readonly resolve: Effect.Effect<string, ResourceMonitorBinaryError>;
   }
->()("openbuff/resourceTelemetry/ResourceMonitorBinary") {}
+>()("@princetheprogrammerbtw/openbuff/resourceTelemetry/ResourceMonitorBinary") {}
 
 function binaryName(platform: NodeJS.Platform): string {
   return platform === "win32" ? "t3-resource-monitor.exe" : "t3-resource-monitor";
@@ -84,7 +84,7 @@ function detectResourceMonitorLinuxLibc(): ResourceMonitorLinuxLibc {
 }
 
 export const ResourceMonitorHostLinuxLibc = Context.Reference<ResourceMonitorLinuxLibc>(
-  "openbuff/resourceTelemetry/ResourceMonitorHostLinuxLibc",
+  "@princetheprogrammerbtw/openbuff/resourceTelemetry/ResourceMonitorHostLinuxLibc",
   {
     defaultValue: detectResourceMonitorLinuxLibc,
   },

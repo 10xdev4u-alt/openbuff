@@ -195,7 +195,7 @@ export class TerminalManager extends Context.Service<
       listener: (event: TerminalMetadataStreamEvent) => Effect.Effect<void>,
     ) => Effect.Effect<() => void>;
   }
->()("openbuff/terminal/Manager/TerminalManager") {}
+>()("@princetheprogrammerbtw/openbuff/terminal/Manager/TerminalManager") {}
 
 interface TerminalSubprocessInspectResult {
   readonly hasRunningSubprocess: boolean;

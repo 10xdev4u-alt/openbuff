@@ -194,4 +194,4 @@ export interface ProjectionSnapshotQueryShape {
 export class ProjectionSnapshotQuery extends Context.Service<
   ProjectionSnapshotQuery,
   ProjectionSnapshotQueryShape
->()("openbuff/orchestration/Services/ProjectionSnapshotQuery") {}
+>()("@princetheprogrammerbtw/openbuff/orchestration/Services/ProjectionSnapshotQuery") {}

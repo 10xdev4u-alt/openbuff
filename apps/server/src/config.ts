@@ -86,7 +86,7 @@ export class ServerConfig extends Context.Service<
     readonly tailscaleServeEnabled: boolean;
     readonly tailscaleServePort: number;
   }
->()("openbuff/config/ServerConfig") {
+>()("@princetheprogrammerbtw/openbuff/config/ServerConfig") {
   /** @deprecated Import and use `layerTest` from this module. */
   static readonly layerTest = (
     cwd: string,

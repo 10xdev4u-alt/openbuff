@@ -265,7 +265,7 @@ export class GitHubCli extends Context.Service<
       readonly force?: boolean;
     }) => Effect.Effect<void, GitHubCliError>;
   }
->()("openbuff/sourceControl/GitHubCli") {}
+>()("@princetheprogrammerbtw/openbuff/sourceControl/GitHubCli") {}
 
 const RawGitHubRepositoryCloneUrlsSchema = Schema.Struct({
   nameWithOwner: TrimmedNonEmptyString,

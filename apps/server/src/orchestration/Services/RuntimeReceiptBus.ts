@@ -62,5 +62,5 @@ export interface RuntimeReceiptBusShape {
 }
 
 export class RuntimeReceiptBus extends Context.Service<RuntimeReceiptBus, RuntimeReceiptBusShape>()(
-  "openbuff/orchestration/Services/RuntimeReceiptBus",
+  "@princetheprogrammerbtw/openbuff/orchestration/Services/RuntimeReceiptBus",
 ) {}

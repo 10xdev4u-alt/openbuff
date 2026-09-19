@@ -77,5 +77,5 @@ export interface ProviderRegistryShape {
 }
 
 export class ProviderRegistry extends Context.Service<ProviderRegistry, ProviderRegistryShape>()(
-  "openbuff/provider/Services/ProviderRegistry",
+  "@princetheprogrammerbtw/openbuff/provider/Services/ProviderRegistry",
 ) {}

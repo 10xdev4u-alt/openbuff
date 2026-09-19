@@ -22,7 +22,7 @@ export class ServerLifecycleEvents extends Context.Service<
     readonly snapshot: Effect.Effect<SnapshotState>;
     readonly stream: Stream.Stream<ServerLifecycleStreamEvent>;
   }
->()("openbuff/serverLifecycleEvents") {}
+>()("@princetheprogrammerbtw/openbuff/serverLifecycleEvents") {}
 
 const make = Effect.gen(function* () {
   const pubsub = yield* PubSub.unbounded<ServerLifecycleStreamEvent>();

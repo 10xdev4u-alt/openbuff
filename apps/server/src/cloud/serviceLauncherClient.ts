@@ -78,7 +78,7 @@ interface ServiceLauncherProcess {
 }
 
 export const ServiceLauncherHostProcess = Context.Reference<ServiceLauncherProcess>(
-  "openbuff/cloud/serviceLauncherHostProcess",
+  "@princetheprogrammerbtw/openbuff/cloud/serviceLauncherHostProcess",
   {
     defaultValue: () => ({
       connected: process.connected && process.send !== undefined,
@@ -109,7 +109,7 @@ export class ServiceLauncherClient extends Context.Service<
       ServiceLauncherClientError
     >;
   }
->()("openbuff/cloud/serviceLauncherClient") {}
+>()("@princetheprogrammerbtw/openbuff/cloud/serviceLauncherClient") {}
 
 const resolveStartup = Effect.fn("cloud.service_launcher_client.resolve_startup")(
   function* (options?: { readonly currentVersion?: string }) {

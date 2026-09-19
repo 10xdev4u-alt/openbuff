@@ -168,7 +168,7 @@ export class VcsStatusBroadcaster extends Context.Service<
       options?: StreamStatusOptions,
     ) => Stream.Stream<VcsStatusStreamEvent, GitManagerServiceError>;
   }
->()("openbuff/vcs/VcsStatusBroadcaster") {}
+>()("@princetheprogrammerbtw/openbuff/vcs/VcsStatusBroadcaster") {}
 
 function fingerprintStatusPart(status: unknown): string {
   return JSON.stringify(status);

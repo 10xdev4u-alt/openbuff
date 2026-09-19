@@ -8,6 +8,7 @@ import packageJson from "../../package.json" with { type: "json" };
 import * as BootService from "../cloud/bootService.ts";
 import type * as ServerConfig from "../config.ts";
 import * as ProcessRunner from "../processRunner.ts";
+import { npmPackageSpec } from "../packageName.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
 
 export const bootServiceLayer = (config: ServerConfig.ServerConfig["Service"]) =>
@@ -65,7 +66,7 @@ export function formatServiceStatus(
   }
   return [
     "OpenBuff service",
-    `  Status: ${status.current ? `installed · openbuff@${cliVersion}` : "needs an update or repair"}`,
+    `  Status: ${status.current ? `installed · ${npmPackageSpec(cliVersion)}` : "needs an update or repair"}`,
     `  Unit: ${status.unitPath}`,
     `  Logs: ${status.logPath}`,
     ...(status.legacyInstalled
@@ -73,7 +74,9 @@ export function formatServiceStatus(
           "  Note: Legacy t3code.service also present — remove it with `openbuff service uninstall`.",
         ]
       : []),
-    ...(status.current ? [] : ["  Next: Run `npx openbuff@latest service update`."]),
+    ...(status.current
+      ? []
+      : ["  Next: Run `npx @princetheprogrammerbtw/openbuff@latest service update`."]),
   ].join("\n");
 }
 
@@ -95,12 +98,12 @@ const serviceInstallCommand = Command.make("install", projectLocationFlags).pipe
         const result = yield* reconcileService();
         if (!result.changed) {
           yield* Console.log(
-            `OpenBuff service is already installed with openbuff@${packageJson.version}.`,
+            `OpenBuff service is already installed with ${npmPackageSpec(packageJson.version)}.`,
           );
           return;
         }
         yield* Console.log(
-          `${result.previouslyInstalled ? "Updated" : "Installed"} OpenBuff service with openbuff@${packageJson.version}.\nLogs: ${result.plan.logPath}`,
+          `${result.previouslyInstalled ? "Updated" : "Installed"} OpenBuff service with ${npmPackageSpec(packageJson.version)}.\nLogs: ${result.plan.logPath}`,
         );
       }),
     ),
@@ -109,7 +112,7 @@ const serviceInstallCommand = Command.make("install", projectLocationFlags).pipe
 
 const serviceUpdateCommand = Command.make("update", projectLocationFlags).pipe(
   Command.withDescription(
-    "Update or repair the background service using this CLI version. Use `npx openbuff@latest service update` for the latest release.",
+    "Update or repair the background service using this CLI version. Use `npx @princetheprogrammerbtw/openbuff@latest service update` for the latest release.",
   ),
   Command.withHandler((flags) =>
     runServiceCommand(
@@ -117,11 +120,13 @@ const serviceUpdateCommand = Command.make("update", projectLocationFlags).pipe(
       Effect.gen(function* () {
         const result = yield* reconcileService();
         if (!result.changed) {
-          yield* Console.log(`OpenBuff service is already using openbuff@${packageJson.version}.`);
+          yield* Console.log(
+            `OpenBuff service is already using ${npmPackageSpec(packageJson.version)}.`,
+          );
           return;
         }
         yield* Console.log(
-          `${result.previouslyInstalled ? "Updated" : "Installed"} OpenBuff service with openbuff@${packageJson.version}.\nLogs: ${result.plan.logPath}`,
+          `${result.previouslyInstalled ? "Updated" : "Installed"} OpenBuff service with ${npmPackageSpec(packageJson.version)}.\nLogs: ${result.plan.logPath}`,
         );
       }),
     ),

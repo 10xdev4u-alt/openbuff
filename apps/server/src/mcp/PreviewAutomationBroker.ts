@@ -56,7 +56,7 @@ export class PreviewAutomationBroker extends Context.Service<
       request: PreviewAutomationInvokeInput,
     ) => Effect.Effect<A, PreviewAutomationError>;
   }
->()("openbuff/mcp/PreviewAutomationBroker") {}
+>()("@princetheprogrammerbtw/openbuff/mcp/PreviewAutomationBroker") {}
 
 interface ClientConnection {
   readonly clientId: string;

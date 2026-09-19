@@ -57,7 +57,7 @@ describe("OpenBuffLanding", () => {
 
   it("shows the one-command start with the real bin name", () => {
     const markup = renderToStaticMarkup(<OpenBuffLanding />);
-    expect(markup).toContain("npx openbuff@latest");
+    expect(markup).toContain("npx @princetheprogrammerbtw/openbuff@latest");
     expect(markup).toContain("Copy command");
   });
 

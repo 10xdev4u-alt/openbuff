@@ -61,7 +61,7 @@ export class TraceDiagnostics extends Context.Service<
       options: TraceDiagnosticsOptions,
     ) => Effect.Effect<ServerTraceDiagnosticsResult>;
   }
->()("openbuff/diagnostics/TraceDiagnostics") {}
+>()("@princetheprogrammerbtw/openbuff/diagnostics/TraceDiagnostics") {}
 
 interface TraceDiagnosticsInput {
   readonly traceFilePath: string;

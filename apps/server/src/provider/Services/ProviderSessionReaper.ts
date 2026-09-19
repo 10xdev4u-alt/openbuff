@@ -12,4 +12,4 @@ export interface ProviderSessionReaperShape {
 export class ProviderSessionReaper extends Context.Service<
   ProviderSessionReaper,
   ProviderSessionReaperShape
->()("openbuff/provider/Services/ProviderSessionReaper") {}
+>()("@princetheprogrammerbtw/openbuff/provider/Services/ProviderSessionReaper") {}
