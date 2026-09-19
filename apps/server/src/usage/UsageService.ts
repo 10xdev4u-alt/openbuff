@@ -89,7 +89,7 @@ export class UsageService extends Context.Service<
   {
     readonly readSummary: (input: UsageSummaryInput) => Effect.Effect<UsageSummary, UsageReadError>;
   }
->()("openbuff/usage/UsageService") {}
+>()("@princetheprogrammerbtw/openbuff/usage/UsageService") {}
 
 /** Empty summary, for suites that only need the RPC surface to resolve. */
 export const layerTest = Layer.succeed(

@@ -86,4 +86,6 @@ export interface ProjectionProjectRepositoryShape {
 export class ProjectionProjectRepository extends Context.Service<
   ProjectionProjectRepository,
   ProjectionProjectRepositoryShape
->()("openbuff/persistence/Services/ProjectionProjects/ProjectionProjectRepository") {}
+>()(
+  "@princetheprogrammerbtw/openbuff/persistence/Services/ProjectionProjects/ProjectionProjectRepository",
+) {}

@@ -75,4 +75,6 @@ export interface ProjectionThreadSessionRepositoryShape {
 export class ProjectionThreadSessionRepository extends Context.Service<
   ProjectionThreadSessionRepository,
   ProjectionThreadSessionRepositoryShape
->()("openbuff/persistence/Services/ProjectionThreadSessions/ProjectionThreadSessionRepository") {}
+>()(
+  "@princetheprogrammerbtw/openbuff/persistence/Services/ProjectionThreadSessions/ProjectionThreadSessionRepository",
+) {}

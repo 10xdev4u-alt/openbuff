@@ -63,4 +63,6 @@ export interface ProjectionStateRepositoryShape {
 export class ProjectionStateRepository extends Context.Service<
   ProjectionStateRepository,
   ProjectionStateRepositoryShape
->()("openbuff/persistence/Services/ProjectionState/ProjectionStateRepository") {}
+>()(
+  "@princetheprogrammerbtw/openbuff/persistence/Services/ProjectionState/ProjectionStateRepository",
+) {}

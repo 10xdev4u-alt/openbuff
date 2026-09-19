@@ -47,7 +47,7 @@ export class T3ProjectFileLoader extends Context.Service<
      */
     readonly load: (workspaceRoot: string) => Effect.Effect<Option.Option<T3ProjectFile>>;
   }
->()("openbuff/project/T3ProjectFileLoader") {}
+>()("@princetheprogrammerbtw/openbuff/project/T3ProjectFileLoader") {}
 
 const logT3ProjectFileLoadError = (error: T3ProjectFileLoadError) =>
   Effect.logWarning(error).pipe(

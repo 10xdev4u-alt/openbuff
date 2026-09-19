@@ -38,4 +38,4 @@ export interface ProviderCommandReactorShape {
 export class ProviderCommandReactor extends Context.Service<
   ProviderCommandReactor,
   ProviderCommandReactorShape
->()("openbuff/orchestration/Services/ProviderCommandReactor") {}
+>()("@princetheprogrammerbtw/openbuff/orchestration/Services/ProviderCommandReactor") {}

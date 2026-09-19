@@ -70,7 +70,9 @@ export class ThreadBackgroundLivenessService extends Context.Service<
      */
     readonly getThreadBackgroundLiveness: (threadId: string) => ThreadBackgroundLiveness;
   }
->()("openbuff/orchestration/ThreadBackgroundLiveness/ThreadBackgroundLivenessService") {}
+>()(
+  "@princetheprogrammerbtw/openbuff/orchestration/ThreadBackgroundLiveness/ThreadBackgroundLivenessService",
+) {}
 
 export function make(): ThreadBackgroundLivenessService["Service"] {
   const stateByThreadId = new Map<string, ThreadLivenessState>();

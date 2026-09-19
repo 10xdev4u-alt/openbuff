@@ -70,7 +70,7 @@ export class ServerRuntimeStartup extends Context.Service<
       effect: Effect.Effect<A, E>,
     ) => Effect.Effect<A, E | ServerRuntimeStartupError>;
   }
->()("openbuff/serverRuntimeStartup") {}
+>()("@princetheprogrammerbtw/openbuff/serverRuntimeStartup") {}
 
 interface QueuedCommand {
   readonly run: Effect.Effect<void, never>;
@@ -170,12 +170,8 @@ export const launchStartupHeartbeat = recordStartupHeartbeat.pipe(
 export const getAutoBootstrapDefaultModelSelection = (
   settings: ContractsServerSettings = DEFAULT_SERVER_SETTINGS,
 ): ModelSelection => {
-  const enabledEntry = Object.entries(settings.providers).find(
-    ([, provider]) => provider.enabled,
-  );
-  const driver = enabledEntry
-    ? ProviderDriverKind.make(enabledEntry[0])
-    : undefined;
+  const enabledEntry = Object.entries(settings.providers).find(([, provider]) => provider.enabled);
+  const driver = enabledEntry ? ProviderDriverKind.make(enabledEntry[0]) : undefined;
   if (driver === undefined) {
     return {
       instanceId: ProviderInstanceId.make("codex"),
@@ -237,7 +233,8 @@ export const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
       } else {
         nextProjectId = existingProject.value.id;
         nextProjectDefaultModelSelection =
-          existingProject.value.defaultModelSelection ?? getAutoBootstrapDefaultModelSelection(liveSettings);
+          existingProject.value.defaultModelSelection ??
+          getAutoBootstrapDefaultModelSelection(liveSettings);
       }
 
       const existingThreadId =
