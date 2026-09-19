@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import { HostProcessArguments } from "@t3tools/shared/hostProcess";
 
 import packageJson from "../../package.json" with { type: "json" };
+import { NPM_PACKAGE_NAME, npmPackageSpec } from "../packageName.ts";
 
 export type CliRunner = "npx" | "pnpm dlx" | "bunx";
 
@@ -39,19 +40,19 @@ export function detectCliRunner(entryPath: string): CliRunner | null {
 }
 
 /**
- * The `openbuff` package spec to suggest. The literal spec the user typed (e.g.
- * `openbuff@nightly`) is resolved away before our process starts, so re-derive it
- * from the running version: nightly builds re-suggest the nightly channel,
- * anything else suggests the bare package.
+ * The package spec to suggest. The literal spec the user typed (e.g.
+ * `@princetheprogrammerbtw/openbuff@nightly`) is resolved away before our
+ * process starts, so re-derive it from the running version: nightly builds
+ * re-suggest the nightly channel, anything else the bare scoped package.
  */
 export function suggestedPackageSpec(version: string): string {
-  return version.includes("-nightly.") ? "openbuff@nightly" : "openbuff";
+  return version.includes("-nightly.") ? npmPackageSpec("nightly") : NPM_PACKAGE_NAME;
 }
 
 /**
  * Render an `openbuff <subcommand>` suggestion that matches how this process was
- * launched, so copy/pasting it actually works: `npx openbuff connect` suggests
- * `npx openbuff serve`, a global install suggests `openbuff serve`, and a nightly build
+ * launched, so copy/pasting it actually works: `npx @princetheprogrammerbtw/openbuff connect` suggests
+ * `npx @princetheprogrammerbtw/openbuff serve`, a global install suggests `openbuff serve`, and a nightly build
  * keeps the `@nightly` tag.
  */
 export function formatCliCommand(input: {

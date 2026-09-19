@@ -16,6 +16,7 @@ import * as Ref from "effect/Ref";
 
 import * as ServerConfig from "../config.ts";
 import * as ProcessRunner from "../processRunner.ts";
+import { npmPackageSpec } from "../packageName.ts";
 import {
   ensurePinnedRuntimeInstalled,
   PinnedRuntimeInstallError,
@@ -43,7 +44,7 @@ export class ServerSelfUpdate extends Context.Service<
       reportProgress?: (stage: ServerSelfUpdateProgressStage) => Effect.Effect<void>,
     ) => Effect.Effect<ServerSelfUpdateResult, ServerSelfUpdateError>;
   }
->()("openbuff/cloud/selfUpdate/ServerSelfUpdate") {}
+>()("@princetheprogrammerbtw/openbuff/cloud/selfUpdate/ServerSelfUpdate") {}
 
 export const make = Effect.fn("cloud.server_self_update.make")(function* () {
   const serverConfig = yield* ServerConfig.ServerConfig;
@@ -164,7 +165,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
         Effect.mapError((error) =>
           error._tag === "PinnedRuntimePreflightBlockedError"
             ? failWith(error.reason, error)
-            : failWith(`Could not prepare openbuff@${targetVersion}.`, error),
+            : failWith(`Could not prepare ${npmPackageSpec(targetVersion)}.`, error),
         ),
       );
 

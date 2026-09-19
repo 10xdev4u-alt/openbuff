@@ -63,8 +63,12 @@ it("detects runners by cache layout, not package name", () => {
 });
 
 it("re-suggests the nightly channel only for nightly builds", () => {
-  assert.equal(suggestedPackageSpec("0.0.31-nightly.20260729"), "openbuff@nightly");
-  assert.equal(suggestedPackageSpec("0.0.31"), "openbuff");
+  // The npm name is the fork's scoped identity (#90); the nightly tag rides on it.
+  assert.equal(
+    suggestedPackageSpec("0.0.31-nightly.20260729"),
+    "@princetheprogrammerbtw/openbuff@nightly",
+  );
+  assert.equal(suggestedPackageSpec("0.0.31"), "@princetheprogrammerbtw/openbuff");
 });
 
 it("formats serve suggestions to match the launching command", () => {
@@ -74,7 +78,7 @@ it("formats serve suggestions to match the launching command", () => {
       entryPath: "/home/theo/.npm/_npx/abc/node_modules/openbuff/dist/bin.mjs",
       version: "0.0.31-nightly.20260729",
     }),
-    "npx openbuff@nightly serve",
+    "npx @princetheprogrammerbtw/openbuff@nightly serve",
   );
   assert.equal(
     formatCliCommand({
@@ -82,7 +86,7 @@ it("formats serve suggestions to match the launching command", () => {
       entryPath: "/tmp/bunx-1000-openbuff@latest/node_modules/openbuff/dist/bin.mjs",
       version: "0.0.31",
     }),
-    "bunx openbuff serve",
+    "bunx @princetheprogrammerbtw/openbuff serve",
   );
   assert.equal(
     formatCliCommand({

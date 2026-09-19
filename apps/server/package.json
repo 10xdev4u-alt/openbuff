@@ -1,11 +1,14 @@
 {
-  "name": "openbuff",
+  "name": "@princetheprogrammerbtw/openbuff",
   "version": "0.0.33",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pingdotgg/t3code",
+    "url": "https://github.com/10xdev4u-alt/openbuff",
     "directory": "apps/server"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "bin": {
      "openbuff": "./dist/bin.mjs"
