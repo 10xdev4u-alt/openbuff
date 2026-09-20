@@ -13,6 +13,15 @@
  *      apps/server/src/config.ts).
  *   3. Emit the staged package.json: catalog specs rewritten verbatim,
  *      devDependencies dropped (all workspace/internal), everything else kept.
+ *   4. Install the staged tree for real (`npm install --omit=dev` inside the
+ *      stage — the staged manifest's `overrides` apply there) so the
+ *      `bundleDependencies` closure (@codebuff/sdk → ai/anthropic/undici)
+ *      ships physically pre-resolved. npm 12 removed shrinkwrap and IGNORES
+ *      `overrides` declared by an installed dependency (#96), and
+ *      @codebuff/sdk exact-pins vulnerable versions — the bundle is the only
+ *      mechanism that reaches them. The overrides are then stripped from the
+ *      staged manifest (npm's pack guard forbids override-affected bundles)
+ *      and the pinned versions are asserted; a drift fails the stage.
  *
  * Output: .publish-stage/ at the repo root. Publish from there:
  *
@@ -31,6 +40,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import { ChildProcess } from "effect/unstable/process";
 import * as Yaml from "yaml";
 
 const stageDirName = ".publish-stage";
@@ -156,8 +166,89 @@ const prepareStage = Effect.gen(function* () {
   yield* fs.copy(webDistDir, path.join(stageDir, "dist", "client"));
   yield* fs.writeFileString(path.join(stageDir, "package.json"), `${encodeJsonText(manifest)}\n`);
 
+  // npm resolves the staged manifest with the overrides honored (the stage
+  // is the project root here) and materializes node_modules, which `npm pack`
+  // then ships for every bundleDependencies entry — physically, pre-resolved,
+  // immune to the client's own override policy.
+  const install = yield* ChildProcess.make(
+    "npm",
+    ["install", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"],
+    {
+      cwd: stageDir,
+      stdout: "inherit",
+      stderr: "inherit",
+    },
+  ).pipe(
+    Effect.mapError(
+      (cause) =>
+        new StageError({
+          message: `npm install failed to start in ${stageDirName}: ${String(cause)}`,
+        }),
+    ),
+  );
+  const installExitCode = yield* install.exitCode.pipe(
+    Effect.mapError(
+      (cause) =>
+        new StageError({
+          message: `npm install crashed: ${String(cause)}`,
+        }),
+    ),
+  );
+  if (installExitCode !== 0) {
+    return yield* new StageError({
+      message: `npm install exited ${installExitCode} — staged manifest does not resolve`,
+    });
+  }
+
+  // Fail closed on the security pins (#96): the bundled closure must carry
+  // exactly the override-target versions, or consumers reinstall the
+  // vulnerable tree from the registry.
+  const assertBundledVersion = Effect.fn("publish-prepare.assertBundledVersion")(function* (
+    packageName: string,
+    expectedVersion: string,
+  ) {
+    const manifestPath = path.join(
+      stageDir,
+      "node_modules",
+      ...packageName.split("/"),
+      "package.json",
+    );
+    if (!(yield* fs.exists(manifestPath))) {
+      return yield* new StageError({
+        message: `bundled closure is missing ${packageName} — bundleDependencies would ship incomplete`,
+      });
+    }
+    const text = yield* fs.readFileString(manifestPath);
+    const parsed = yield* Effect.try({
+      try: () => decodeJsonText(text),
+      catch: (cause: unknown) =>
+        new StageError({
+          message: `${packageName}/package.json is not valid JSON: ${String(cause)}`,
+        }),
+    });
+    const version = (parsed as Record<string, unknown>)["version"];
+    if (version !== expectedVersion) {
+      return yield* new StageError({
+        message: `bundled ${packageName}@${String(version)} != pinned ${expectedVersion} — the override pins drifted; re-prove the audit before shipping`,
+      });
+    }
+  });
+  yield* assertBundledVersion("undici", "6.28.1");
+  yield* assertBundledVersion("@ai-sdk/anthropic", "2.0.102");
+
+  // npm's pack guard rejects manifests where `overrides` affect bundled
+  // packages ("consumers do not apply your package's overrides"). The
+  // overrides have already done their job — the node_modules above were
+  // resolved WITH them — so the shipped manifest drops them and the bundle
+  // travels as the physical, pre-resolved truth. Verified end-to-end:
+  // consumer install reports 0 vulnerabilities and arborist extracts the
+  // bundle without re-resolving its edges.
+  const stagedManifestPath = path.join(stageDir, "package.json");
+  delete manifestRecord["overrides"];
+  yield* fs.writeFileString(stagedManifestPath, `${encodeJsonText(manifest)}\n`);
+
   yield* Effect.logInfo(
-    `staged ${manifestRecord["name"] as string}@${manifestRecord["version"] as string} in ${stageDirName}: ${Object.keys(resolved).length} dependencies resolved (catalog rewritten), web client bundled at dist/client`,
+    `staged ${manifestRecord["name"] as string}@${manifestRecord["version"] as string} in ${stageDirName}: ${Object.keys(resolved).length} dependencies resolved (catalog rewritten), vulnerable chain bundled pre-resolved, web client bundled at dist/client`,
   );
 });
 
