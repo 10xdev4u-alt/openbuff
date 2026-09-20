@@ -157,3 +157,17 @@ Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-o
 - **Worked / failed (evidence)**: Three real-world seams no test suite covers: (1) pnpm `catalog:` specifiers survive every pnpm pack/deploy path in v11 — deterministic stage script is the only honest route; (2) npm's `versioned` endpoint 200s minutes before the packument does — "404" on a fresh publish is propagation, not failure (shasum match is the proof of identity); (3) node-pty's `prebuild.js` exits 0 while producing no binary — a fallback built on it silently no-ops (caught by CodeRabbit, confirmed by running it).
 - **Rule**: For anything users _install_, prove the exact end-user path (pack → install from the artifact → boot → serve) — the repo suite cannot see registry/packager behavior. When a tool's success output can't be distinguished from a no-op, choose the alternative that fails loudly.
 - **Graph nodes updated**: NPM publish pipeline row (2026-09-20) added.
+
+## 2026-09-20 — npm dependency-resolution traps (session #96→#97)
+
+**What I tried**: fix the 8-advisory user install via manifest `overrides` (dep position) → npm-shrinkwrap.json → bundleDependencies.
+
+**What worked/failed + evidence**:
+- FAILED: `overrides` inside a published dependency are IGNORED by npm — my scratch-tree "win" was a false fix (overrides only bind at the user's project root). Caught by re-proving on the packed artifact in a fresh tree: vulnerable copies returned.
+- FAILED: `npm-shrinkwrap.json` — npm 12 removed it from published tarballs (packlist hard-excludes; verified in `publish --dry-run`).
+- WORKED: `bundleDependencies: ["@codebuff/sdk"]` — the official npm 12 replacement. Stage installs WITH overrides, bundle ships pre-resolved; arborist extracts as-is (edge-repair disproven by experiment). User audit 8 → 0.
+- WORKED: `node-pty@1.2.0-beta.15` ships `prebuilds/linux-*` in the npm tarball → installs with zero scripts under npm's allowScripts gating (1.1.0 was fatal).
+- Meta: CodeRabbit's Major (root-only pin assertions) was valid — defense fixed with a tree-wide scanner + negative tests.
+
+**Lesson as reusable rule**: Never trust a dependency-position override fix until proven on the PACKED artifact installed in USER position; npm 12's only shipped-tree mechanism is bundleDependencies; every security assertion must cover nested copies, not root manifests.
+- **Graph nodes updated**: install-security row (2026-09-20) added.
