@@ -66,6 +66,12 @@ const prepareStage = Effect.gen(function* () {
       message: "apps/web/dist/index.html missing — run `pnpm build` first",
     });
   }
+  const readmePath = path.join(repoRoot, "README.md");
+  if (!(yield* fs.exists(readmePath))) {
+    return yield* new StageError({
+      message: "README.md missing — the npm package page renders it from the tarball root",
+    });
+  }
 
   const manifestText = yield* fs.readFileString(path.join(serverDir, "package.json"));
   const manifest = yield* Effect.try({
@@ -142,6 +148,7 @@ const prepareStage = Effect.gen(function* () {
 
   yield* fs.remove(stageDir, { recursive: true, force: true });
   yield* fs.makeDirectory(stageDir, { recursive: true });
+  yield* fs.copy(readmePath, path.join(stageDir, "README.md"));
   yield* fs.copy(distDir, path.join(stageDir, "dist"));
   // The installed CLI must serve the web UI itself: the monorepo fallback in
   // resolveWebClientDist cannot exist in an installed package, and an installed

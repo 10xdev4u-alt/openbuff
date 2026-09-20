@@ -49,6 +49,23 @@ look and feel we brought to the web UI:
 - **Motion** — M3 emphasized/decelerate/accelerate/spring easings and nav/sheet/fade/micro
   durations as tokens, with reduced-motion and off modes that honor `prefers-reduced-motion`.
 
+## Troubleshooting
+
+**Server exits immediately on first run (Linux).** The bundled terminal needs the `node-pty`
+native module, and npm may skip its compile step under the default install-script gating
+(`npm warn install-scripts node-pty@…`). If the server exits right after start with a
+`Failed to load native module: pty.node` error, rebuild it once and start again:
+
+```bash
+npm rebuild node-pty
+# if the server still exits with `Failed to load native module: pty.node`:
+cd node_modules/node-pty && node-gyp rebuild   # needs make/g++/python3; fails loudly
+```
+
+The same applies when installing via `npm i -g @princetheprogrammerbtw/openbuff` — run the
+rebuild inside the global `node_modules/node-pty`. This is an upstream packaging caveat
+(`node-pty` ships prebuilt binaries for Windows/macOS only), not an app defect.
+
 ## Credits & licenses
 
 - **[t3 Code](https://github.com/pingdotgg/t3code)** by T3 Tools Inc. — MIT. The entire web
