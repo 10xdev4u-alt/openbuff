@@ -57,7 +57,9 @@ native module, and npm may skip its compile step under the default install-scrip
 `Failed to load native module: pty.node` error, rebuild it once and start again:
 
 ```bash
-npm rebuild node-pty || (cd node_modules/node-pty && node scripts/prebuild.js)
+npm rebuild node-pty
+# if the server still exits with `Failed to load native module: pty.node`:
+cd node_modules/node-pty && node-gyp rebuild   # needs make/g++/python3; fails loudly
 ```
 
 The same applies when installing via `npm i -g @princetheprogrammerbtw/openbuff` — run the
