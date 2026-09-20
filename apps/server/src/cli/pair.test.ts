@@ -206,8 +206,8 @@ describe("t3 pair", () => {
         typeof error === "object" && error !== null && "cause" in error ? error.cause : error,
       );
       assert.include(rendered, "No running OpenBuff server found.");
-      assert.include(rendered, "npx openbuff serve");
-      assert.include(rendered, "npx openbuff connect");
+      assert.include(rendered, "npx @princetheprogrammerbtw/openbuff serve");
+      assert.include(rendered, "npx @princetheprogrammerbtw/openbuff connect");
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 

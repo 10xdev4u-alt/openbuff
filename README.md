@@ -5,7 +5,7 @@
 One command starts a clean local web app in your browser, backed by the real Freebuff agent engine working on your files: chat, live tool calls, diffs, terminals, and turn-by-turn git checkpoints.
 
 ```bash
-npx openbuff@latest
+npx @princetheprogrammerbtw/openbuff@latest
 ```
 
 ## What this is
@@ -28,7 +28,7 @@ Roadmap:
 - [x] Terminal output bridged into the built-in terminal view
 - [x] Rebrand sweep (web UI, server strings, package names)
 - [x] Turn checkpoints + diff review on Freebuff file changes
-- [x] `npx openbuff` distribution
+- [x] `npx @princetheprogrammerbtw/openbuff` distribution
 - [x] Local browser login (no pairing gate on loopback) + Freebuff CLI credential reuse
 - [x] M3 Expressive design language (see below)
 

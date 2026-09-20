@@ -7,7 +7,7 @@ import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 const BodoniHeadline = lazy(() => import("./BodoniHeadline"));
 
 const NODE_ENGINES = "^22.16 || ^23.11 || >=24.10";
-const START_COMMAND = "npx openbuff@latest";
+const START_COMMAND = "npx @princetheprogrammerbtw/openbuff@latest";
 
 const FACTS: ReadonlyArray<{ readonly title: string; readonly body: string }> = [
   {

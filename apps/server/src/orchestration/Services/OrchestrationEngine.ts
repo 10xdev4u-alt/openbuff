@@ -79,4 +79,6 @@ export interface OrchestrationEngineShape {
 export class OrchestrationEngineService extends Context.Service<
   OrchestrationEngineService,
   OrchestrationEngineShape
->()("openbuff/orchestration/Services/OrchestrationEngine/OrchestrationEngineService") {}
+>()(
+  "@princetheprogrammerbtw/openbuff/orchestration/Services/OrchestrationEngine/OrchestrationEngineService",
+) {}

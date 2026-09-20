@@ -100,7 +100,9 @@ export class ProviderSessionRuntimeRepository extends Context.Service<
       input: DeleteProviderSessionRuntimeInput,
     ) => Effect.Effect<void, ProviderSessionRuntimeRepositoryError>;
   }
->()("openbuff/persistence/ProviderSessionRuntime/ProviderSessionRuntimeRepository") {}
+>()(
+  "@princetheprogrammerbtw/openbuff/persistence/ProviderSessionRuntime/ProviderSessionRuntimeRepository",
+) {}
 
 const ProviderSessionRuntimeDbRowSchema = ProviderSessionRuntime.mapFields(
   Struct.assign({

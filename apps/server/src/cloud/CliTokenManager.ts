@@ -230,7 +230,7 @@ export class CloudCliTokenManager extends Context.Service<
     readonly store: (token: PersistedToken) => Effect.Effect<void, CloudCliTokenManagerError>;
     readonly clear: Effect.Effect<void, CloudCliTokenManagerError>;
   }
->()("openbuff/cloud/CliTokenManager/CloudCliTokenManager") {}
+>()("@princetheprogrammerbtw/openbuff/cloud/CliTokenManager/CloudCliTokenManager") {}
 
 function stringToBytes(value: string): Uint8Array {
   return new TextEncoder().encode(value);

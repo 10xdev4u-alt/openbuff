@@ -427,9 +427,7 @@ export class EnvironmentAuth extends Context.Service<
      * loopback + same-origin (see the browserSession HTTP handler) — the
      * physical machine is the identity, so no pairing token is required.
      */
-    readonly createLocalBrowserSession: (
-      requestMetadata: AuthClientMetadata,
-    ) => Effect.Effect<
+    readonly createLocalBrowserSession: (requestMetadata: AuthClientMetadata) => Effect.Effect<
       {
         readonly response: AuthBrowserSessionResult;
         readonly sessionToken: string;
@@ -505,7 +503,7 @@ export class EnvironmentAuth extends Context.Service<
       baseUrl: string,
     ) => Effect.Effect<string, ServerAuthInternalError>;
   }
->()("openbuff/auth/EnvironmentAuth") {}
+>()("@princetheprogrammerbtw/openbuff/auth/EnvironmentAuth") {}
 
 type BootstrapExchangeResult = {
   readonly response: AuthBrowserSessionResult;
@@ -703,36 +701,35 @@ export const make = Effect.gen(function* () {
       Effect.withSpan("EnvironmentAuth.createBrowserSession"),
     );
 
-  const createLocalBrowserSession: EnvironmentAuth["Service"]["createLocalBrowserSession"] =
-    (requestMetadata) =>
-      sessions
-        .issue({
-          method: "browser-session-cookie",
-          subject: DEFAULT_SESSION_SUBJECT,
-          scopes: [...AuthStandardClientScopes],
-          client: {
-            ...requestMetadata,
-            label: "Local (loopback)",
-          },
-        })
-        .pipe(
-          Effect.mapError(
-            (cause) => new ServerAuthAuthenticatedSessionIssueError({ cause }),
-          ),
-          Effect.map(
-            (session) =>
-              ({
-                response: {
-                  authenticated: true,
-                  scopes: session.scopes,
-                  sessionMethod: session.method,
-                  expiresAt: DateTime.toUtc(session.expiresAt),
-                } satisfies AuthBrowserSessionResult,
-                sessionToken: session.token,
-              }) satisfies BootstrapExchangeResult,
-          ),
-          Effect.withSpan("EnvironmentAuth.createLocalBrowserSession"),
-        );
+  const createLocalBrowserSession: EnvironmentAuth["Service"]["createLocalBrowserSession"] = (
+    requestMetadata,
+  ) =>
+    sessions
+      .issue({
+        method: "browser-session-cookie",
+        subject: DEFAULT_SESSION_SUBJECT,
+        scopes: [...AuthStandardClientScopes],
+        client: {
+          ...requestMetadata,
+          label: "Local (loopback)",
+        },
+      })
+      .pipe(
+        Effect.mapError((cause) => new ServerAuthAuthenticatedSessionIssueError({ cause })),
+        Effect.map(
+          (session) =>
+            ({
+              response: {
+                authenticated: true,
+                scopes: session.scopes,
+                sessionMethod: session.method,
+                expiresAt: DateTime.toUtc(session.expiresAt),
+              } satisfies AuthBrowserSessionResult,
+              sessionToken: session.token,
+            }) satisfies BootstrapExchangeResult,
+        ),
+        Effect.withSpan("EnvironmentAuth.createLocalBrowserSession"),
+      );
 
   const exchangeBootstrapCredentialForAccessToken: EnvironmentAuth["Service"]["exchangeBootstrapCredentialForAccessToken"] =
     (credential, requestedScopes, requestMetadata, input) =>

@@ -108,7 +108,7 @@ function provider(): ServerProvider {
       status: "behind_latest",
       currentVersion: "1.0.0",
       latestVersion: "1.1.0",
-      updateCommand: "npx openbuff@latest",
+      updateCommand: "npx @princetheprogrammerbtw/openbuff@latest",
       canUpdate: true,
       checkedAt: "2026-07-24T12:00:00.000Z",
       message: "Update available.",
@@ -226,7 +226,10 @@ describe("EnvironmentProviderSettings routing", () => {
       favorites: [{ provider: customFreebuffId, model: "favorite" }],
     };
     const panel = renderPanel();
-    const customCard = visitElements(panel, (element) => element.props.instanceId === customFreebuffId);
+    const customCard = visitElements(
+      panel,
+      (element) => element.props.instanceId === customFreebuffId,
+    );
     expect(customCard).not.toBeNull();
     (customCard?.props.onDelete as (() => void) | undefined)?.();
 

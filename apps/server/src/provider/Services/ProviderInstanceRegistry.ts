@@ -84,4 +84,4 @@ export interface ProviderInstanceRegistryShape {
 export class ProviderInstanceRegistry extends Context.Service<
   ProviderInstanceRegistry,
   ProviderInstanceRegistryShape
->()("openbuff/provider/Services/ProviderInstanceRegistry") {}
+>()("@princetheprogrammerbtw/openbuff/provider/Services/ProviderInstanceRegistry") {}

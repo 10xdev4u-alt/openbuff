@@ -37,3 +37,6 @@ node_modules/
 .env*
 !.env.example
 .freebuff/
+
+# npm publish staging (scripts/publish-prepare.ts output, always rebuilt)
+.publish-stage/

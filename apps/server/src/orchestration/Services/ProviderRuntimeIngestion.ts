@@ -38,4 +38,6 @@ export interface ProviderRuntimeIngestionShape {
 export class ProviderRuntimeIngestionService extends Context.Service<
   ProviderRuntimeIngestionService,
   ProviderRuntimeIngestionShape
->()("openbuff/orchestration/Services/ProviderRuntimeIngestion/ProviderRuntimeIngestionService") {}
+>()(
+  "@princetheprogrammerbtw/openbuff/orchestration/Services/ProviderRuntimeIngestion/ProviderRuntimeIngestionService",
+) {}

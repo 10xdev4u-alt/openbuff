@@ -59,7 +59,7 @@ export class CloudManagedEndpointRuntime extends Context.Service<
       config: RelayManagedEndpointRuntimeConfig | null,
     ) => Effect.Effect<CloudManagedEndpointRuntimeStatus>;
   }
->()("openbuff/cloud/ManagedEndpointRuntime/CloudManagedEndpointRuntime") {}
+>()("@princetheprogrammerbtw/openbuff/cloud/ManagedEndpointRuntime/CloudManagedEndpointRuntime") {}
 
 interface ActiveConnector {
   readonly child: ChildProcessSpawner.ChildProcessHandle;

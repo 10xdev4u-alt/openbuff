@@ -67,4 +67,4 @@ export interface ProviderSessionDirectoryShape {
 export class ProviderSessionDirectory extends Context.Service<
   ProviderSessionDirectory,
   ProviderSessionDirectoryShape
->()("openbuff/provider/Services/ProviderSessionDirectory") {}
+>()("@princetheprogrammerbtw/openbuff/provider/Services/ProviderSessionDirectory") {}
