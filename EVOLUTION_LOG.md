@@ -8,14 +8,17 @@ Format: What I tried | What worked/failed + evidence | Lesson as reusable rule |
 Read root manifests + README + AGENTS.md, listed `apps/`, `packages/`, `apps/server/src`, `packages/contracts/src`, `persistence/`, `provider/Drivers|Services`, `orchestration/`, `checkpointing/`; read `FreebuffDriver.ts` (150/261), `FreebuffAdapter.ts` (120/719), `FreebuffSession.ts` (90/203), `Migrations.ts`, `005_Projections.ts`, `OrchestrationEngine.ts`, `ws.ts` head, `bin.ts`, glossary head; `git log -12`.
 
 **Worked**
+
 - Repo identified in 4 tool rounds: fork of t3code with single SDK-backed driver; event-sourced server architecture confirmed from `persistence/Services/*` + glossary.
 - Docs/code divergence detected twice (AGENTS.md provider list; adapter header vs shipped approval flow) — both recorded in `docs/KNOWLEDGE_GRAPH.md` §4.
 
 **Failed / friction**
+
 - `code_search` returned **0 matches** for "codebuff" inside `apps/` despite the string existing in files it listed — tool silently unreliable here (index hit its 10k-file cap). Lesson recorded below.
 - Reading `005_Projections.ts` paid off more than expected: migration files are the cheapest ground truth for the read model.
 
 **Rules (reusable)**
+
 1. In this repo, prefer `glob`/`list_directory`/direct reads over `code_search`; the search index truncates at 10k files and can report 0 on real matches.
 2. Migration files are the DB schema's source of truth; read `Migrations.ts` first for any data-layer task.
 3. This fork's docs lie in upstream's favor: verify every provider/desktop/mobile claim against `apps/` reality before acting on prose.
@@ -32,10 +35,11 @@ Read root manifests + README + AGENTS.md, listed `apps/`, `packages/`, `apps/ser
 **Failed:** first IPv4 curl to web got 000 — web binds `[::1]` only. `BACKGROUND` process_type unimplemented → `setsid`+pidfile pattern instead. I tried to edit KNOWLEDGE_GRAPH.md with a fabricated anchor string — my own error, cost one failed tool call.
 
 **Rules:**
+
 1. Probe web on `localhost`/`[::1]`, never `127.0.0.1` (IPv6-only bind).
 2. Long-running procs: `setsid nohup … & echo $! > .freebuff/*.pid`; kill only the captured PID.
 3. `register_preview` requires `url`+`pid` together for dev servers.
-4. Check pinned tests before assuming a string bug is one-line — but check the *code* before assuming the test is wrong (this time test+code agreed).
+4. Check pinned tests before assuming a string bug is one-line — but check the _code_ before assuming the test is wrong (this time test+code agreed).
 5. When editing files, re-grep for the anchor if a prior write may have shifted it; never quote from memory.
 
 **Graph nodes updated:** §5 Runtime evidence added; task log row appended.
@@ -49,9 +53,10 @@ Read root manifests + README + AGENTS.md, listed `apps/`, `packages/`, `apps/ser
 **Failed/friction:** two grep pipelines reported nothing where output was ambiguous (exit codes eaten by `\|\|` chains) — nearly misread as fact. Rule: re-probe with `grep -c` + explicit exit echo when a negative claim matters.
 
 **Rules:**
+
 1. Never claim "X doesn't exist" from a grep whose exit code you didn't check.
 2. Vendor references in `.repos/` follow repo convention — clone reference repos there, never import from them.
-3. When a workaround smells overbuilt (fetch interceptor), search the vendor's newer source for the official hook *before* trusting the installed version's limits.
+3. When a workaround smells overbuilt (fetch interceptor), search the vendor's newer source for the official hook _before_ trusting the installed version's limits.
 4. Pair (`error` code, `statusCode`) is the only reliable gate classifier — status or code alone lets upstream errors impersonate the gate.
 
 **Graph nodes updated:** §5.5 added (9-row protocol audit); task log row appended.
@@ -67,6 +72,7 @@ Read root manifests + README + AGENTS.md, listed `apps/`, `packages/`, `apps/ser
 **What failed + evidence:** (1) Local "TSC-EXIT:0" was `head`'s exit code, not tsc's — CI failed on `exactOptionalPropertyTypes` (TS2412) I never saw. (2) Same class again: `pnpm typecheck` grep swallowed the exit code, which then surfaced the real `globalDate` lint. (3) Merged #43 in a batched command without reading CodeRabbit's CHANGES_REQUESTED first — process miss, self-caught, finding fixed as #44.
 
 **Lessons (reusable rules):**
+
 1. After a pipe, `$?` is the LAST command's status. Propagate the real exit: `${PIPESTATUS[0]}` or run the checker bare before grepping. (Repeat of an earlier mistake — counter now 2. A third repeat means the workflow itself changes: no piped checker assertions, ever.)
 2. `exactOptionalPropertyTypes` requires `field?: T | undefined` when assigning possibly-undefined values — check tsconfig flags before writing optional-bearing APIs.
 3. This repo requires Effect `Clock` for time access; plain modules opt out via `// @effect-diagnostics globalDate:off` with rationale (convention: serviceLauncher.ts, usageAggregation.ts).
@@ -75,10 +81,12 @@ Read root manifests + README + AGENTS.md, listed `apps/`, `packages/`, `apps/ser
 **Graph nodes updated:** §1/§2/mermaid POST refs → admission route (PR #44); task log row appended.
 
 ### 2026-09-16 — #28 free model default (PR #47, MERGED ffc59855)
+
 What I tried: contracts free-pin constant + map entry; settings-aware bootstrap selection (first enabled driver, per-driver default, codex fallback); live-settings boot seeding; Layer.merge for chained provides.
 What worked/failed: TDD held (RED 3→GREEN); evidence flipped the issue's own acceptance reading — `DEFAULT_MODEL` must STAY `gpt-5.6-sol` because it IS codex's map value; repointing it would hand codex users a model their plan may not include. FAILED locally-green/CI-red AGAIN (pipeline-exit mistake, third variant: counted `error TS` lines instead of asserting tsgo exit code; repo's tsgo fails on warnings).
 Lesson as reusable rule: pipeline-exit counter is now 3 → per charter the workflow changes: checker gates run BARE (no pipe) with `echo EXIT:$?` immediately after; grep filters only for display. Also: tsgo here treats warnings as errors — never ship new `multipleEffectProvide`/suggestion diagnostics.
 Graph nodes updated: task log row appended (§6).
+
 ## 2026-09-16 — lock-in session (#29, #27, #31, #30 arcs)
 
 What I tried: full factory loop across 8 PRs (#49–#56), one session-death mid-arc, two review legs, one CI typecheck failure.
@@ -87,50 +95,65 @@ Lesson as reusable rule: evidence beats every document — including my own past
 Graph nodes updated: task log rows for #27 (3 PRs), #31 (2 PRs), #30; §5 FreebuffSession/FreebuffAdapter rows refreshed.
 
 ## 2026-09-16 — repeat-marker escalation (merge-before-green, count 4)
+
 What I tried: review-then-merge batching on docs PRs #57/#58 with Tests still pending.
 What worked/failed + evidence: both verified all-SUCCESS post-merge, but the process rule broke twice more; counter 2→4.
 Lesson as reusable rule (workflow change, per charter): **the merge command MUST be a separate tool call that starts with an explicit gate check** — `gh pr checks <n> | grep -c "^Build.*pass"` etc. must equal the expected gate count in the SAME command, immediately before `gh pr merge`. No docs-only exemption: the check is one grep, cheaper than the verification debt it prevents.
 Graph nodes updated: none needed beyond task-log rows already merged.
+
 ## 2026-09-17 — process lessons, lock-in lap 2
 
 What I tried: the lock-in lap plan (#55 server half → #55 web half → docs sweep → landing page) with the merge-gate rule active; a docs round via the graph task log; a process correction after one charter breach.
 
-What worked + evidence: (1) The gate rule blocked PR #60's first merge attempt — CI caught a **time bomb I planted myself** (cockpit test fixture hardcoded `resetAt: 2026-09-17T07:00Z`, written the day before; the clock expired it). Fix: clock-relative fixtures; lesson — *never hardcode absolute timestamps in fixtures when the SUT reads the wall clock; derive from Date.now().* (2) CodeRabbit Majors on #60 were both valid: replacement race in `stopSession` (guard `sessions.get(threadId) === state` before delete) and unbounded DELETE (bound via `AbortSignal.timeout` + signal-abort race — a signal alone cannot bound a fetch that ignores it; covered by a never-settling injected fetch). (3) Effect 4 gotchas banked: `Effect.andThen(effect, callback)` rejects a callback returning undefined ("Not a valid effect"); `Effect.promise` rejects as defect → needs `Effect.ignoreCause`, not `Effect.ignore`.
+What worked + evidence: (1) The gate rule blocked PR #60's first merge attempt — CI caught a **time bomb I planted myself** (cockpit test fixture hardcoded `resetAt: 2026-09-17T07:00Z`, written the day before; the clock expired it). Fix: clock-relative fixtures; lesson — _never hardcode absolute timestamps in fixtures when the SUT reads the wall clock; derive from Date.now()._ (2) CodeRabbit Majors on #60 were both valid: replacement race in `stopSession` (guard `sessions.get(threadId) === state` before delete) and unbounded DELETE (bound via `AbortSignal.timeout` + signal-abort race — a signal alone cannot bound a fetch that ignores it; covered by a never-settling injected fetch). (3) Effect 4 gotchas banked: `Effect.andThen(effect, callback)` rejects a callback returning undefined ("Not a valid effect"); `Effect.promise` rejects as defect → needs `Effect.ignoreCause`, not `Effect.ignore`.
 
 What failed + evidence: **one direct push to main** (`651ead01`) — skipped branch-before-commit under momentum and `git push -q` shipped main. Self-caught within one command; breach visible in history; logged here rather than history-scrubbed. Lesson as reusable rule: **the branch command precedes the first commit of every unit — no exceptions for docs; a breach is logged, not erased.**
 
 Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-out (#61).
 
 ## 2026-09-18 — session (#73, #74)
+
 - **Tried**: legacy-unit status surfacing (#71→#73) and welcome head metadata (#72→#74). **Worked**: both arcs ran issue→RED→GREEN→gate→review→merge with zero rework once the gate lesson landed. **Failed once**: shipped PR #73 without running the local `typecheck` — CI round-1 caught a real arity bug (`formatServiceStatus` called with 1 arg) that runtime tests missed because the assertions never touched the version line. Fixed at source, and typecheck ran locally before every subsequent push. **Lesson (reusable)**: `vp test` green ≠ compiles; the merge-gate simulation is typecheck + tests + fmt, ALL locally, before `git push` — CI is the audit, not the first line of defense.
-- **CodeRabbit arbitration**: two Minors on #73 were both valid (legacy-only status printed the *new* unit path that doesn't exist; a non-Linux special-case contradicted AC1's "every platform") — fixed by adding `legacyUnitPath` to the status contract and deleting the branch. **Lesson**: an over-fitted conditional is usually a missing data field in disguise.
-- **#72 honesty guard**: head metadata shipped *without* `og:image` because no asset exists (verified `apps/web/public/`) — a 404 preview is worse than none. Follow-up raised with design ACs.
+- **CodeRabbit arbitration**: two Minors on #73 were both valid (legacy-only status printed the _new_ unit path that doesn't exist; a non-Linux special-case contradicted AC1's "every platform") — fixed by adding `legacyUnitPath` to the status contract and deleting the branch. **Lesson**: an over-fitted conditional is usually a missing data field in disguise.
+- **#72 honesty guard**: head metadata shipped _without_ `og:image` because no asset exists (verified `apps/web/public/`) — a 404 preview is worse than none. Follow-up raised with design ACs.
 - **Graph**: rows added for #71 and #72. Nodes: BootServiceStatus.legacyInstalled/legacyUnitPath, welcomeHead data contract.
 
 ## 2026-09-18 — session (#63, #65, #66)
+
 - **Tried**: docs sweep (#32), landing page (#33), runner-string issue (#64). **Worked**: evidence-first triage kept `usage.md` alive (UsageService really scans codex/claude transcripts) while killing 7 upstream-only docs; CodeRabbit arbitrated findings produced real fixes (service.ts strings, clipboard success-only announcement). **Lesson (reusable)**: a bot review is free hostile-senior review — verify each finding against code, then fix the valid ones at the source, not the symptom.
 - **Repeated mistake caught**: committed straight to `main` again (2nd time). Correction executed properly this time (branch carried the commit, main reset to origin, PR loop completed). **Rule**: `git checkout -b` BEFORE the first edit of any task, not before the commit — the branch is the unit of work, not the commit.
 - **Issue-premise corrections**: #32's "five providers" claims were real upstream residue (fixed), but #64's "runner detection strings" were already package-agnostic — the real bug was `pinnedRuntime` installing upstream `t3@` from npm. **Lesson**: an issue names a symptom; the evidence pass names the bug.
 - **Graph**: updated in every PR (#63, #65, #66 rows). Nodes: pinned-runtime contract, /welcome route, docs tree fork-reality.
 
 ## 2026-09-19 — session (#75 og:image, #77)
+
 - **Tried**: full #75 arc — real satori+resvg og.png from the app's own fonts/tokens, committed generator as provenance, determinism proof (byte-identical reruns, single sha256), pixel + visual audit before commit. **Worked**: asset and provenance shipped; CodeRabbit's round-1 Minor was the catch of the session — route `head` config ≠ rendered head: **`HeadContent` was never mounted anywhere in `__root.tsx`**, so every tag we ship exists only in route config. Fixed by mounting it in all three `RootRouteView` branches, verified against installed router source (`HeadContent` renders `useTags()` as real `<meta>` elements). **Lesson (reusable)**: metadata that is configured but never rendered is silent no-op — head plumbing must be proven at the DOM level (source or live), not at the config level; unit tests asserting pure data cannot see the missing mount.
-- **Discovery (architectural, now in the graph)**: a logged-out landing is unreachable from the physical machine by design — `attemptLocalBootstrap` (environments/primary/auth.ts:322) auto-grants sessions to loopback same-origin browsers ("physical machine = identity"), and HttpOnly cookies carry it across ports. `/welcome` is served to *remote* visitors only. Verified by wiping every JS-visible storage layer and watching re-auth happen. **Rule**: when state seems stuck, read the bootstrap source before blaming the browser.
+- **Discovery (architectural, now in the graph)**: a logged-out landing is unreachable from the physical machine by design — `attemptLocalBootstrap` (environments/primary/auth.ts:322) auto-grants sessions to loopback same-origin browsers ("physical machine = identity"), and HttpOnly cookies carry it across ports. `/welcome` is served to _remote_ visitors only. Verified by wiping every JS-visible storage layer and watching re-auth happen. **Rule**: when state seems stuck, read the bootstrap source before blaming the browser.
 - **Sandbox ops banked**: Freebuff's tool boundary reaps non-setsid children (nohup+subshell dies; `setsid bash -c` survives); vite-plus binds **v6-side only** (`*:port` — 127.0.0.1 refuses, [::1]/localhost answer; my own #58 devBindHost finding validating live); hermetic browser runs via throwaway `T3CODE_HOME` server + `T3CODE_PORT`-proxied web — never touch the real `~/.openbuff`; fresh sandbox needs `npx -y pnpm@11.10.0 install --frozen-lockfile` (corepack shim broken under mise).
 - **Graph**: rows added for #75 and the #77 fix. Nodes: og.png + generator provenance, HeadContent mount, loopback auto-bootstrap.
 
 ## 2026-09-19 — session (#79 pair head, #80 pairing a11y)
+
 - **Tried**: back-to-back arcs on the remote-visitor front door. #79 (pair route head metadata): raised from the audit, shipped `pairHead()` mirroring `welcomeHead`, with the og:image-included decision (anti-phishing card; token in fragment never fetched by previewers) recorded in the route docblock. #80 (pairing a11y): extracted `PairingAlert` (role=alert) / `PairingStatus` (role=status) / `busyAttribute` primitives, wired into both pairing surfaces, autoFocus + focus-return on the token input. **Worked**: both merged clean, one CodeRabbit Minor each lap was real and fixed (#81: missing og:image assertion; none on #82 — rate-limited). **Lesson (reusable)**: when a bot review is unavailable or rate-limited, self-arbitrate the previous lap's catches — assert every tag you ship (#79's lesson came from #75's own review pattern), and pin styling contracts in tests when extracting shared components so "pure semantics" stays verifiably zero-visual-diff.
 - **Test-strategy note**: no DOM env / testing-library exists in this toolchain; house idiom is pure-logic extraction + `renderToStaticMarkup` — role/aria attributes DO land in static markup, so semantics are testable without a browser. Focus behavior (autoFocus, ref return) is verified by reading the actual pass-through chain (Input nativeInput spread, React 19 ref-as-prop) rather than faked in tests.
 - **Graph**: rows added for #79 and #80. Nodes: pairHead, PairingAlert/PairingStatus/busyAttribute primitives, pairing focus flow.
 
 ## 2026-09-19 — session (#84 fetch deadline)
-- **Tried**: resilience audit of the pairing flow after the board drained. Verified a real gap: `exchangeBootstrapCredential` had bounded RETRY (15s/500ms on 502/503/504 + TypeError) but no DEADLINE — a never-settling fetch hung the pairing form forever. Verified against the installed stack, not docs: client-runtime's own `Effect.timeoutOption` machinery is unwired for the primary client (`remoteHttpClientLayer` = plain FetchHttpClient). **Worked**: shipped `withCredentialExchangeDeadline` → typed `PrimaryEnvironmentRequestDeadlineError` (30s), with the proof being a REAL hung-server simulation (`Effect.never` handler + 50ms test seam) asserting typed failure + exactly one call (no retry spin). CodeRabbit approved with zero findings. **Lesson (reusable)**: (1) retry ≠ timeout — a retry loop only sees *failures*; anything that never settles bypasses it entirely, so every user-facing request path needs both. (2) Typed errors must be rethrown BEFORE generic fromCause-style wraps, or the wrap buries them and downstream classification (transient/non-transient) acts on the wrong type. (3) Effect-4 details: timeout wrappers must be generic over <A,E,R> (context channel is real); `HttpClientError` is a namespace, the concrete type is `HttpClientError.HttpClientError`.
+
+- **Tried**: resilience audit of the pairing flow after the board drained. Verified a real gap: `exchangeBootstrapCredential` had bounded RETRY (15s/500ms on 502/503/504 + TypeError) but no DEADLINE — a never-settling fetch hung the pairing form forever. Verified against the installed stack, not docs: client-runtime's own `Effect.timeoutOption` machinery is unwired for the primary client (`remoteHttpClientLayer` = plain FetchHttpClient). **Worked**: shipped `withCredentialExchangeDeadline` → typed `PrimaryEnvironmentRequestDeadlineError` (30s), with the proof being a REAL hung-server simulation (`Effect.never` handler + 50ms test seam) asserting typed failure + exactly one call (no retry spin). CodeRabbit approved with zero findings. **Lesson (reusable)**: (1) retry ≠ timeout — a retry loop only sees _failures_; anything that never settles bypasses it entirely, so every user-facing request path needs both. (2) Typed errors must be rethrown BEFORE generic fromCause-style wraps, or the wrap buries them and downstream classification (transient/non-transient) acts on the wrong type. (3) Effect-4 details: timeout wrappers must be generic over <A,E,R> (context channel is real); `HttpClientError` is a namespace, the concrete type is `HttpClientError.HttpClientError`.
 - **Process miss (caught pre-commit, logged anyway)**: built this arc's changes on `main` — the create-branch-FIRST rule exists and I skipped it. Working tree was clean of commits so `git checkout -b` carried everything with zero loss, but the rule exists precisely because the pre-commit state is not always recoverable. **Rule reinforced**: `git branch --show-current` before the first edit of every arc, not before the commit.
 - **Graph**: row added for #84. Nodes: withCredentialExchangeDeadline, PrimaryEnvironmentRequestDeadlineError, deadline test seam.
 
 ## 2026-09-19 — session (#87 settings heads, title-descriptor law)
+
 - **Tried**: visual audit first (screenshot-driven design polish). Honest result: NO visual defect — both "bugs" (Times New Roman hero, missing h1) were artifacts of my method (stale dist from before #70; SSR rendering the Suspense fallback instead of the lazy headline). **Lesson**: fresh-build grep is the only truth (`vp build` then grep the hashed CSS); renderToStaticMarkup renders Suspense FALLBACKS, not lazy components — static HTML ≠ runtime DOM for lazy trees. No theater issue filed.
 - **Shipped**: #87 settings/usage heads (10 leaves, single-source appHeads.ts, wiring asserted at module level). Then CodeRabbit's Major became the **catch of the session**: `{ name: "title" }` is a DEAD format — router-core maps only `m.title` to a real `<title>` element (react-router headContentUtils.tsx:38-45). #74, #81, the root route, and #88 itself all shipped dead titles; the bug was invisible because every test asserted the same wrong contract its author wrote. **Lesson (reusable)**: (1) a test that asserts the wrong contract is worse than no test — it launders the bug through every gate; (2) when a library offers two superficially similar shapes for one concept (descriptor vs meta tag), read the renderer's branch logic, not the docs; (3) bot review caught what 3 human-authored PRs + their tests + 2600 green tests did not — arbitrate findings on source evidence, and when one is valid, sweep the WHOLE codebase for the same pattern, not just the finding's line.
 - **Also audited, no issue (no theater)**: hosted-pairing flow — host param validated (scheme allowlist, schemeless→https deliberate), both network calls deadline-bounded. Graph row records the audit.
 - **Graph**: rows for the audit + the title-descriptor law. Nodes: appHeads.ts, title descriptor format, router head dedup.
+
+## 2026-09-20 — s34: publishing is a runtime contract, not a manifest field
+
+- **Tried**: publish `@princetheprogrammerbtw/openbuff` end to end (issue #90 arc) and polish the npm page (#93).
+- **Worked / failed (evidence)**: Three real-world seams no test suite covers: (1) pnpm `catalog:` specifiers survive every pnpm pack/deploy path in v11 — deterministic stage script is the only honest route; (2) npm's `versioned` endpoint 200s minutes before the packument does — "404" on a fresh publish is propagation, not failure (shasum match is the proof of identity); (3) node-pty's `prebuild.js` exits 0 while producing no binary — a fallback built on it silently no-ops (caught by CodeRabbit, confirmed by running it).
+- **Rule**: For anything users _install_, prove the exact end-user path (pack → install from the artifact → boot → serve) — the repo suite cannot see registry/packager behavior. When a tool's success output can't be distinguished from a no-op, choose the alternative that fails loudly.
+- **Graph nodes updated**: NPM publish pipeline row (2026-09-20) added.
