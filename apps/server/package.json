@@ -1,7 +1,16 @@
 {
   "name": "@princetheprogrammerbtw/openbuff",
-  "version": "0.0.33",
+  "version": "0.0.34",
+  "description": "Open-source, ad-free web experience for Freebuff — a local server + web UI for the free AI coding agent, powered by the real Freebuff engine on your machine.",
   "license": "MIT",
+  "keywords": [
+    "ai",
+    "coding-agent",
+    "freebuff",
+    "local-first",
+    "web-ui",
+    "cli"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/10xdev4u-alt/openbuff",
@@ -11,7 +20,7 @@
     "access": "public"
   },
   "bin": {
-     "openbuff": "./dist/bin.mjs"
+    "openbuff": "./dist/bin.mjs"
   },
   "files": [
     "dist"
