@@ -10,7 +10,7 @@ npx @princetheprogrammerbtw/openbuff@latest
 
 ## What this is
 
-- **Local-first.** A server runs on *your* machine (the execution boundary: files, terminals, git). The web UI is served from it. Nothing of ours runs in the cloud — there is no "ours" to run.
+- **Local-first.** A server runs on _your_ machine (the execution boundary: files, terminals, git). The web UI is served from it. Nothing of ours runs in the cloud — there is no "ours" to run.
 - **Freebuff-powered.** The agent engine is [Freebuff](https://freebuff.com)'s (via `@codebuff/sdk`, Apache-2.0) — free-tier models, no ads in this app, no telemetry from this app. Bring a free API key from [codebuff.com/api-keys](https://codebuff.com/api-keys) and you're running.
 - **Flagship UI.** A fork of [t3 Code](https://t3.codes)' web experience (MIT), refocused around a single engine.
 
@@ -51,20 +51,26 @@ look and feel we brought to the web UI:
 
 ## Troubleshooting
 
-**Server exits immediately on first run (Linux).** The bundled terminal needs the `node-pty`
-native module, and npm may skip its compile step under the default install-script gating
-(`npm warn install-scripts node-pty@…`). If the server exits right after start with a
-`Failed to load native module: pty.node` error, rebuild it once and start again:
+**No native builds needed.** The bundled terminal runs on `node-pty@1.2.0-beta.15`, whose npm
+tarball ships prebuilt binaries for Linux (x64/arm64), macOS, and Windows — its install script
+being blocked by npm's default script gating is harmless.
+
+If the server ever exits at boot with `Failed to load native module: pty.node` (e.g. an exotic
+libc or architecture), compile the module once — this fails loudly if your toolchain
+(make/g++/python3) is missing:
 
 ```bash
-npm rebuild node-pty
-# if the server still exits with `Failed to load native module: pty.node`:
-cd node_modules/node-pty && node-gyp rebuild   # needs make/g++/python3; fails loudly
+cd node_modules/node-pty && node-gyp rebuild
 ```
 
-The same applies when installing via `npm i -g @princetheprogrammerbtw/openbuff` — run the
-rebuild inside the global `node_modules/node-pty`. This is an upstream packaging caveat
-(`node-pty` ships prebuilt binaries for Windows/macOS only), not an app defect.
+For global installs, run the same command inside the global `node_modules/node-pty`.
+
+**Advisory posture:** a fresh `npm install @princetheprogrammerbtw/openbuff` reports
+**0 vulnerabilities** (`npm audit`). `@codebuff/sdk` exact-pins a vulnerable `undici@5.29.0`
+chain that neither dedupe nor dependency-position `overrides` can reach (and npm 12 removed
+shrinkwrap), so the pinned clean closure ships physically via `bundleDependencies` —
+pre-resolved at publish time and verified by the release script. If an install ever surfaces
+advisories again, they arrive through upstream (`@codebuff/sdk` → `ai`) — please open an issue.
 
 ## Credits & licenses
 

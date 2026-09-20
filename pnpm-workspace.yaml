@@ -109,6 +109,8 @@ overrides:
   vite: "catalog:"
   yaml: "catalog:"
 
+  "undici@^5.29.0": 6.28.1
+  "@ai-sdk/anthropic": 2.0.102
 packageExtensions:
   "@clerk/expo@*":
     dependencies:

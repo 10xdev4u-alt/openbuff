@@ -1,23 +1,20 @@
 {
   "name": "@princetheprogrammerbtw/openbuff",
-  "version": "0.0.34",
+  "version": "0.0.35",
   "description": "Open-source, ad-free web experience for Freebuff — a local server + web UI for the free AI coding agent, powered by the real Freebuff engine on your machine.",
-  "license": "MIT",
   "keywords": [
     "ai",
+    "cli",
     "coding-agent",
     "freebuff",
     "local-first",
-    "web-ui",
-    "cli"
+    "web-ui"
   ],
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/10xdev4u-alt/openbuff",
     "directory": "apps/server"
-  },
-  "publishConfig": {
-    "access": "public"
   },
   "bin": {
     "openbuff": "./dist/bin.mjs"
@@ -26,6 +23,9 @@
     "dist"
   ],
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "node --watch src/bin.ts",
     "build:bundle": "vp pack && vp pack src/service-launcher.ts --out-dir dist --no-clean",
@@ -43,7 +43,7 @@
     "@pierre/diffs": "catalog:",
     "effect": "catalog:",
     "msgpackr-extract": "3.0.4",
-    "node-pty": "^1.1.0",
+    "node-pty": "1.2.0-beta.15",
     "yaml": "catalog:"
   },
   "devDependencies": {
@@ -55,6 +55,13 @@
     "@types/bun": "1.3.14",
     "@types/node": "catalog:",
     "vite-plus": "catalog:"
+  },
+  "bundleDependencies": [
+    "@codebuff/sdk"
+  ],
+  "overrides": {
+    "@ai-sdk/anthropic": "2.0.102",
+    "undici@^5.29.0": "6.28.1"
   },
   "engines": {
     "node": "^22.16 || ^23.11 || >=24.10"
