@@ -1,13 +1,11 @@
 // @effect-diagnostics nodeBuiltinImport:off - reads the real repo manifests.
 import * as NodeFS from "node:fs";
+import * as NodeOs from "node:os";
 import * as NodePath from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
 
-/** Mirrors NPM_PACKAGE_NAME in apps/server/src/packageName.ts — kept literal so
- * this composite script project does not pull server sources into its program.
- * If the package identity ever changes, update both. */
-const NPM_PACKAGE_NAME = "@princetheprogrammerbtw/openbuff";
+import { hasPinnedUndici, NPM_PACKAGE_NAME, scanStagedTree } from "./install-security.ts";
 
 const readServerManifest = (): Record<string, unknown> =>
   JSON.parse(
@@ -70,5 +68,100 @@ describe("install security contract", () => {
   it("stays the scoped npm identity", () => {
     const manifest = readServerManifest();
     assert.strictEqual(manifest["name"], NPM_PACKAGE_NAME);
+  });
+});
+
+describe("staged tree scan (#97 security review)", () => {
+  const writeManifest = (
+    dir: string,
+    name: string,
+    version: string,
+    deps?: Record<string, string>,
+  ): void => {
+    NodeFS.mkdirSync(dir, { recursive: true });
+    NodeFS.writeFileSync(
+      NodePath.join(dir, "package.json"),
+      JSON.stringify({ name, version, ...(deps ? { dependencies: deps } : {}) }),
+    );
+  };
+
+  const makeStage = (): string => {
+    const stageDir = NodeFS.mkdtempSync(
+      NodePath.join(NodeFS.realpathSync(NodeOs.tmpdir()), "ob-stage-"),
+    );
+    // Root + a bundled-closure nesting like the real stage ships.
+    writeManifest(stageDir, NPM_PACKAGE_NAME, "0.0.0-test", { "@codebuff/sdk": "0.35.0" });
+    writeManifest(NodePath.join(stageDir, "node_modules", "undici"), "undici", "6.28.1");
+    const sdk = NodePath.join(stageDir, "node_modules", "@codebuff", "sdk");
+    writeManifest(sdk, "@codebuff/sdk", "0.35.0", {
+      ai: "5.0.261",
+      "@ai-sdk/anthropic": "2.0.102",
+    });
+    const sdkNm = NodePath.join(sdk, "node_modules");
+    writeManifest(NodePath.join(sdkNm, "@ai-sdk", "anthropic"), "@ai-sdk/anthropic", "2.0.102");
+    writeManifest(NodePath.join(sdkNm, "ai"), "ai", "5.0.261", { "@ai-sdk/gateway": "2.0.153" });
+    writeManifest(NodePath.join(sdkNm, "@ai-sdk", "gateway"), "@ai-sdk/gateway", "2.0.153", {
+      undici: "^5.29.0",
+    });
+    return stageDir;
+  };
+
+  it("accepts a clean bundled tree with the pinned copies", () => {
+    assert.deepStrictEqual(scanStagedTree(makeStage()), []);
+    assert.ok(hasPinnedUndici(makeStage()));
+  });
+
+  it("rejects a vulnerable nested anthropic copy inside the closure", () => {
+    const stageDir = makeStage();
+    writeManifest(
+      NodePath.join(
+        stageDir,
+        "node_modules",
+        "@codebuff",
+        "sdk",
+        "node_modules",
+        "@ai-sdk",
+        "anthropic",
+      ),
+      "@ai-sdk/anthropic",
+      "2.0.50",
+    );
+    const violations = scanStagedTree(stageDir);
+    assert.ok(violations[0] !== undefined, "expected exactly one violation");
+    assert.match(violations[0].violation, /2\.0\.50 != pinned 2\.0\.102/);
+  });
+
+  it("rejects a vulnerable-range undici copy while preserving unrelated versions", () => {
+    const stageDir = makeStage();
+    // Deep-nest a copy selected through the vulnerable range.
+    const sdkNm = NodePath.join(stageDir, "node_modules", "@codebuff", "sdk", "node_modules");
+    writeManifest(NodePath.join(sdkNm, "undici"), "undici", "5.29.0");
+    writeManifest(
+      NodePath.join(stageDir, "node_modules", "unrelated-lib"),
+      "unrelated-lib",
+      "1.0.0",
+      { undici: "^7.0.0" },
+    );
+    const violations = scanStagedTree(stageDir);
+    assert.strictEqual(
+      violations.length,
+      1,
+      `expected only the vulnerable-scope violation, got: ${JSON.stringify(violations)}`,
+    );
+    assert.ok(violations[0] !== undefined);
+    assert.match(violations[0].violation, /vulnerable \^5\.29\.0 range/);
+    // An unrelated-range undici somewhere else must NOT be flagged.
+    writeManifest(
+      NodePath.join(stageDir, "node_modules", "unrelated-lib", "node_modules", "undici"),
+      "undici",
+      "7.2.1",
+    );
+    assert.strictEqual(scanStagedTree(stageDir).length, 1);
+  });
+
+  it("fails when the pinned undici copy is missing entirely", () => {
+    const stageDir = makeStage();
+    NodeFS.rmSync(NodePath.join(stageDir, "node_modules", "undici"), { recursive: true });
+    assert.ok(!hasPinnedUndici(stageDir));
   });
 });

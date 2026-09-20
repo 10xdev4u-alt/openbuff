@@ -43,6 +43,8 @@ import * as Schema from "effect/Schema";
 import { ChildProcess } from "effect/unstable/process";
 import * as Yaml from "yaml";
 
+import { hasPinnedUndici, REQUIRED_UNDICI_VERSION, scanStagedTree } from "./install-security.ts";
+
 const stageDirName = ".publish-stage";
 
 class StageError extends Data.TaggedError("StageError")<{
@@ -200,41 +202,24 @@ const prepareStage = Effect.gen(function* () {
     });
   }
 
-  // Fail closed on the security pins (#96): the bundled closure must carry
-  // exactly the override-target versions, or consumers reinstall the
-  // vulnerable tree from the registry.
-  const assertBundledVersion = Effect.fn("publish-prepare.assertBundledVersion")(function* (
-    packageName: string,
-    expectedVersion: string,
-  ) {
-    const manifestPath = path.join(
-      stageDir,
-      "node_modules",
-      ...packageName.split("/"),
-      "package.json",
-    );
-    if (!(yield* fs.exists(manifestPath))) {
-      return yield* new StageError({
-        message: `bundled closure is missing ${packageName} — bundleDependencies would ship incomplete`,
-      });
-    }
-    const text = yield* fs.readFileString(manifestPath);
-    const parsed = yield* Effect.try({
-      try: () => decodeJsonText(text),
-      catch: (cause: unknown) =>
-        new StageError({
-          message: `${packageName}/package.json is not valid JSON: ${String(cause)}`,
-        }),
+  // Fail closed on the security pins (#96, #97): the contract must cover
+  // EVERY manifest in the staged tree — the bundled closure ships nested
+  // copies a root-level check never sees. Any `@ai-sdk/anthropic` outside
+  // the pin fails, as does any undici copy selected through the vulnerable
+  // `^5.29.0` range (unrelated undici versions stay out of scope); the
+  // pinned clean undici must also EXIST somewhere — positive proof the
+  // override resolution held.
+  const stagedViolations = scanStagedTree(stageDir);
+  if (stagedViolations.length > 0) {
+    return yield* new StageError({
+      message: `bundled closure violates the security pins — re-prove the audit before shipping:\n${stagedViolations.map((v) => `  - ${v.packageJsonPath}: ${v.violation}`).join("\n")}`,
     });
-    const version = (parsed as Record<string, unknown>)["version"];
-    if (version !== expectedVersion) {
-      return yield* new StageError({
-        message: `bundled ${packageName}@${String(version)} != pinned ${expectedVersion} — the override pins drifted; re-prove the audit before shipping`,
-      });
-    }
-  });
-  yield* assertBundledVersion("undici", "6.28.1");
-  yield* assertBundledVersion("@ai-sdk/anthropic", "2.0.102");
+  }
+  if (!hasPinnedUndici(stageDir)) {
+    return yield* new StageError({
+      message: `staged tree carries no undici@${REQUIRED_UNDICI_VERSION} — the override resolution did not hold`,
+    });
+  }
 
   // npm's pack guard rejects manifests where `overrides` affect bundled
   // packages ("consumers do not apply your package's overrides"). The
