@@ -334,6 +334,11 @@ export const makeFreebuffAdapter = (
     installFreebuffFetchInterceptor();
     let eventCount = 0;
     const sessions = new Map<ThreadId, FreebuffSession>();
+    // Sticky account-level first-tab discount opt-in (issue #122): "1" only
+    // once a captured quote has said `firstTabDiscount.available`; quotes
+    // that omit the offer leave it untouched. The first-ever admission opts
+    // out — nothing has been offered yet (upstream store semantics).
+    let firstTabDiscountOptIn = false;
 
     const emit = (event: ProviderRuntimeEvent) => Queue.offer(runtimeEvents, event);
     const makeEventId = () => {
@@ -549,6 +554,7 @@ export const makeFreebuffAdapter = (
               establishFreebuffSession(config.apiKey, {
                 signal: abort.signal,
                 ...(modelSelection !== undefined ? { model: modelSelection } : {}),
+                firstTabDiscount: firstTabDiscountOptIn,
                 ...(fetchImpl !== undefined ? { fetch: fetchImpl } : {}),
               }),
             catch: (cause) =>
@@ -582,6 +588,12 @@ export const makeFreebuffAdapter = (
           }
           state.freebuffInstanceId = admission.instanceId;
           state.latestQuotaByModel = admission.rateLimitsByModel;
+          // Capture the offer for the NEXT admission: the quote's
+          // `available` drives the opt-in; absent offers change nothing.
+          const offer = admission.freebucks?.firstTabDiscount;
+          if (offer !== undefined) {
+            firstTabDiscountOptIn = offer.available;
+          }
           if (usageRef !== undefined) {
             usageRef.current = mergeProviderUsage(
               usageRef.current,

@@ -149,6 +149,13 @@ export interface FreebuffSessionFreebucks {
   readonly planId: string | null;
   /** Session price per model id; only metered models appear. */
   readonly prices: Record<string, number>;
+  /** Regular prices, present once the wire supplies them — the pre-discount base. */
+  readonly listPrices?: Record<string, number>;
+  /** The first-tab discount offer as the wire carries it (issue #122). */
+  readonly firstTabDiscount?: {
+    readonly amount: number;
+    readonly available: boolean;
+  };
 }
 
 /**
@@ -156,8 +163,7 @@ export interface FreebuffSessionFreebucks {
  * guarantees — we surface that as a reload/update error rather than silently
  * degrading to the legacy session path.
  */
-export const FREEBUFF_SESSION_ADMISSION_PATH =
-  "/api/v1/freebuff/session/admission";
+export const FREEBUFF_SESSION_ADMISSION_PATH = "/api/v1/freebuff/session/admission";
 
 /** Session poll/release path (GET poll, DELETE release). */
 export const FREEBUFF_SESSION_PATH = "/api/v1/freebuff/session";
@@ -167,9 +173,7 @@ export const FREEBUFF_SESSION_UNSUPPORTED_MESSAGE =
   "This server cannot safely start or resume your session yet. Reload or update and try again shortly. No purchase was made.";
 
 /** Machine-readable error code for the unsupported-server case. */
-export type FreebuffSessionErrorCode =
-  | "session_admission_unsupported"
-  | string;
+export type FreebuffSessionErrorCode = "session_admission_unsupported" | string;
 
 /** Typed failure from a hard session-API error (status + code + retry hint). */
 export class FreebuffSessionRequestError extends Error {
@@ -177,12 +181,7 @@ export class FreebuffSessionRequestError extends Error {
   readonly errorCode?: string | undefined;
   readonly retryAfterMs?: number | undefined;
 
-  constructor(
-    message: string,
-    status: number,
-    retryAfterMs?: number,
-    errorCode?: string,
-  ) {
+  constructor(message: string, status: number, retryAfterMs?: number, errorCode?: string) {
     super(message);
     this.name = "FreebuffSessionRequestError";
     this.status = status;
@@ -192,10 +191,7 @@ export class FreebuffSessionRequestError extends Error {
 }
 
 /** `parseRetryAfterMs` equivalent: seconds, or an HTTP date → ms from now. */
-function parseRetryAfterMs(
-  value: string | null,
-  nowMs: number = Date.now(),
-): number | undefined {
+function parseRetryAfterMs(value: string | null, nowMs: number = Date.now()): number | undefined {
   if (value === null) return undefined;
   const seconds = Number(value);
   if (Number.isFinite(seconds) && seconds >= 0) {
@@ -490,9 +486,13 @@ export async function releaseFreebuffSession(
         signal,
       }),
       new Promise<never>((_, reject) => {
-        signal.addEventListener("abort", () => reject(new Error("freebuff session release timed out")), {
-          once: true,
-        });
+        signal.addEventListener(
+          "abort",
+          () => reject(new Error("freebuff session release timed out")),
+          {
+            once: true,
+          },
+        );
       }),
     ]);
   } catch {
@@ -522,15 +522,10 @@ export function installFreebuffFetchInterceptor(): void {
   ): Promise<Response> => {
     const ctx = turnContext.getStore();
     const url =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
+      typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     const method = (init?.method ?? "GET").toUpperCase();
 
-    const isChatCompletion =
-      method === "POST" && url.includes("/api/v1/chat/completions");
+    const isChatCompletion = method === "POST" && url.includes("/api/v1/chat/completions");
     if (!ctx || !isChatCompletion || typeof init?.body !== "string") {
       return nativeFetch(input, init);
     }
@@ -559,9 +554,6 @@ export function installFreebuffFetchInterceptor(): void {
  * Every chat-completion request the SDK issues while `fn` is in flight picks
  * up this session's instance id.
  */
-export function runWithFreebuffSession<T>(
-  instanceId: string,
-  fn: () => Promise<T>,
-): Promise<T> {
+export function runWithFreebuffSession<T>(instanceId: string, fn: () => Promise<T>): Promise<T> {
   return turnContext.run({ instanceId }, fn);
 }
