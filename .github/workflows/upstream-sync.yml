@@ -48,7 +48,7 @@ jobs:
             echo "- path overlap with our tree: $(comm -12 <(echo "$CHANGED" | sort) <(git ls-files | sort) | grep -c . || true)"
             echo
             echo "### Semantic watch hits (upstream change → our module)"
-            WATCH_FILE=/tmp/watch-map.txt
+            WATCH_FILE=.github/sync-watch-map.txt
             while IFS='|' read -r PREFIX OURS; do
               HITS=$(echo "$CHANGED" | grep -c "^$PREFIX" || true)
               if [ "$HITS" -gt 0 ]; then
