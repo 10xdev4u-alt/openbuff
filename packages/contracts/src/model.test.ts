@@ -19,9 +19,7 @@ describe("default model truth", () => {
   });
 
   it("maps the freebuff driver to the free pin", () => {
-    expect(DEFAULT_MODEL_BY_PROVIDER[FREEBUFF_DRIVER_KIND]).toBe(
-      "deepseek/deepseek-v4-flash",
-    );
+    expect(DEFAULT_MODEL_BY_PROVIDER[FREEBUFF_DRIVER_KIND]).toBe("deepseek/deepseek-v4-flash");
   });
 
   it("keeps the codex driver default independent (must not inherit the free pin)", () => {
@@ -38,15 +36,19 @@ describe("default model truth", () => {
 });
 
 describe("FREEBUFF_FREE_AGENT_BY_MODEL", () => {
-  it("carries exactly the eight upstream free-tier pairings", () => {
+  it("carries exactly the upstream free-tier pairings", () => {
     expect(Object.keys(FREEBUFF_FREE_AGENT_BY_MODEL).sort()).toEqual(
       [
         "crof/kimi-k3-eco",
         "deepseek/deepseek-v4-flash",
         "deepseek/deepseek-v4-pro",
+        "google/gemini-3.8-flash",
+        "meta/muse-spark-1.3-contributor",
         "minimax/minimax-m3",
         "mimo/mimo-v2.5",
         "openai/gpt-5.6-luna",
+        "stealth/ox-alpha",
+        "upstage/solar-pro4",
         "z-ai/glm-5.2",
         "z-ai/glm-5.3-flash",
       ].sort(),
@@ -78,9 +80,7 @@ describe("resolveFreebuffAgentForModel", () => {
   });
 
   it("falls back to the free pin's agent for unknown models", () => {
-    expect(resolveFreebuffAgentForModel("acme/nonexistent")).toBe(
-      "base3-free-deepseek-flash",
-    );
+    expect(resolveFreebuffAgentForModel("acme/nonexistent")).toBe("base3-free-deepseek-flash");
   });
 
   it("falls back when the selection is absent", () => {
