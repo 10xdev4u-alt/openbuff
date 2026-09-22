@@ -33,7 +33,6 @@ import * as Schema from "effect/Schema";
 
 import * as Stream from "effect/Stream";
 
-
 import {
   defaultProviderContinuationIdentity,
   type ProviderDriver,
@@ -57,6 +56,11 @@ const FREEBUFF_MODEL_DISPLAY_NAME_BY_SLUG: Readonly<Record<string, string>> = {
   "z-ai/glm-5.2": "GLM 5.2",
   "z-ai/glm-5.3-flash": "GLM 5.3 Flash",
   "crof/kimi-k3-eco": "Kimi K3",
+  // CLI-selectable upstream additions (#119).
+  "stealth/ox-alpha": "Ox Alpha",
+  "upstage/solar-pro4": "Solar Pro 4",
+  "google/gemini-3.8-flash": "Gemini 3.8 Flash",
+  "meta/muse-spark-1.3-contributor": "Muse Spark 1.3",
 };
 
 /**
@@ -114,12 +118,7 @@ const resolveAuth = (
 
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const credentialsPath = path.join(
-      NodeOS.homedir(),
-      ".config",
-      "manicode",
-      "credentials.json",
-    );
+    const credentialsPath = path.join(NodeOS.homedir(), ".config", "manicode", "credentials.json");
     const contents = yield* fileSystem
       .readFileString(credentialsPath)
       .pipe(Effect.orElseSucceed(() => null));
@@ -129,9 +128,9 @@ const resolveAuth = (
     // `Schema.Json` is the schema of already-parsed JSON values, so decoding a
     // raw string against it succeeds trivially and returns the string unchanged.
     // `fromJsonString` is what actually parses the JSON text into a value.
-    const parsedUnknown = yield* Schema.decodeUnknownEffect(
-      Schema.fromJsonString(Schema.Unknown),
-    )(contents).pipe(Effect.orElseSucceed(() => null));
+    const parsedUnknown = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(
+      contents,
+    ).pipe(Effect.orElseSucceed(() => null));
     const parsed =
       typeof parsedUnknown === "object" && parsedUnknown !== null
         ? (parsedUnknown as { default?: { authToken?: unknown; email?: unknown } })
@@ -251,7 +250,10 @@ export const FreebuffDriver: ProviderDriver<FreebuffSettings, FreebuffDriverEnv>
               ...(usage !== undefined ? { usage } : {}),
               ...current,
               auth: {
-                status: nextAuth.token.length > 0 ? ("authenticated" as const) : ("unauthenticated" as const),
+                status:
+                  nextAuth.token.length > 0
+                    ? ("authenticated" as const)
+                    : ("unauthenticated" as const),
                 type: "freebuff_cli",
                 label:
                   nextAuth.token.length > 0
@@ -306,4 +308,3 @@ export const FreebuffDriver: ProviderDriver<FreebuffSettings, FreebuffDriverEnv>
       }),
     ),
 };
-

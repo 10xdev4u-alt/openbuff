@@ -188,6 +188,13 @@ export const FREEBUFF_FREE_AGENT_BY_MODEL: Readonly<Record<string, string>> = {
   "z-ai/glm-5.2": "base3-free-glm",
   "z-ai/glm-5.3-flash": "base3-free-glm-5-3-flash",
   "crof/kimi-k3-eco": "base3-free-kimi-k3-eco",
+  // CLI-selectable upstream additions (2026-09 week, verified against the
+  // upstream CLI base3 map during the #116 port review) — each with a real
+  // base3-free-* agent twin; wire ids from upstream model constants.
+  "stealth/ox-alpha": "base3-free-ox-alpha",
+  "upstage/solar-pro4": "base3-free-solar-pro4",
+  "google/gemini-3.8-flash": "base3-free-gemini-3-8-flash",
+  "meta/muse-spark-1.3-contributor": "base3-free-muse-spark-1-3",
 };
 
 /** Every selectable free-tier model id (the picker's row set). */
