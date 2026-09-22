@@ -70,20 +70,10 @@ import {
   FREEBUFF_FREE_AGENT_BY_MODEL,
   resolveFreebuffAgentForModel,
 } from "@t3tools/contracts";
-import {
-  classifyFreebuffGate,
-  freebuffGateDisposition,
-  gateUserMessage,
-} from "./FreebuffGate.ts";
-import {
-  mergeProviderUsage,
-  usageFromSessionResponse,
-} from "../providerUsageMerge.ts";
+import { classifyFreebuffGate, freebuffGateDisposition, gateUserMessage } from "./FreebuffGate.ts";
+import { mergeProviderUsage, usageFromSessionResponse } from "../providerUsageMerge.ts";
 import type { FreebuffProviderUsage } from "@t3tools/contracts";
-import type {
-  ProviderAdapterShape,
-  ProviderThreadSnapshot,
-} from "./ProviderAdapter.ts";
+import type { ProviderAdapterShape, ProviderThreadSnapshot } from "./ProviderAdapter.ts";
 import type { FreebuffSettings } from "@t3tools/contracts";
 import {
   classifySessionPoll,
@@ -209,36 +199,105 @@ const nowIso = (): string => Effect.runSync(Effect.map(DateTime.now, DateTime.fo
  * `{CODEBUFF_*}` placeholders the upstream base3 harness uses, so they are
  * inlined or dropped here.
  */
+/**
+ * The reviewer subagent's id — the upstream-canonical `code-reviewer`.
+ *
+ * OpenBuff ships what upstream free tiers gate away (#107): base2-tier
+ * roots spawn reviewers, base3 free roots don't. Our root template is
+ * local, so we can arm it.
+ */
+export const FREEBUFF_REVIEWER_AGENT_ID = "code-reviewer";
+
+/**
+ * The reviewer subagent, pinned to the session's OWN model.
+ *
+ * The same-model rule is load-bearing: the chat-completions session gate
+ * rejects any request whose model differs from the admitted session's
+ * (`session_model_mismatch`) — a reviewer on any other model dies mid-run,
+ * silently, exactly how upstream Fable lost code review until it got its
+ * own entry (`.repos/freebuff/common/src/constants/free-agents.ts:432-441`).
+ * Shape mirrors upstream `createReviewer` (agents/reviewer/code-reviewer.ts):
+ * no tools, reports via `last_message`, sees the parent conversation so it
+ * can judge the recent changes.
+ */
+function makeFreebuffReviewerAgent(resolvedModel: string): AgentDefinition {
+  return {
+    id: FREEBUFF_REVIEWER_AGENT_ID,
+    displayName: "OpenBuff Reviewer",
+    model: resolvedModel,
+    providerOptions: { data_collection: "deny" },
+    outputMode: "last_message",
+    toolNames: [],
+    spawnableAgents: [],
+    includeMessageHistory: true,
+    inputSchema: {
+      prompt: {
+        type: "string",
+        description: "What should be reviewed. Be brief.",
+      },
+    },
+    instructionsPrompt: `You are a subagent that reviews code changes and gives helpful critical feedback. Do not use any tools — you can only suggest changes; never edit files.
+
+# Task
+
+Review the last file changes made by the assistant in the conversation above. Find concrete ways to improve them: correctness risks, missed edge cases, convention violations, test gaps.
+
+Be brief. If there is nothing substantive to flag, say it looks good in one sentence. Skip praise sections — critical feedback only.`,
+  };
+}
+
+/**
+ * The root template plus every agent it names, registered as one LOCAL
+ * suite. A `spawnableAgents` entry that is not also a local template falls
+ * through to the publisher database — which 404s for free agents — and
+ * hangs the run forever; the suite makes dangling spawns unrepresentable.
+ */
+export function makeFreebuffAgentSuite(model: string | undefined): {
+  root: AgentDefinition;
+  agentDefinitions: AgentDefinition[];
+} {
+  const root = makeFreebuffBaseAgent(model);
+  return {
+    root,
+    agentDefinitions: [makeFreebuffReviewerAgent(root.model as string)],
+  };
+}
+
 function makeFreebuffBaseAgent(model: string | undefined): AgentDefinition {
   const resolvedModel =
     model !== undefined && model in FREEBUFF_FREE_AGENT_BY_MODEL
       ? model
       : DEFAULT_FREEBUFF_FREE_MODEL;
   return {
-  id: resolveFreebuffAgentForModel(model),
-  displayName: "Buffy",
-  model: resolvedModel,
-  providerOptions: { data_collection: "deny" },
-  outputMode: "last_message",
-  includeMessageHistory: true,
-  inputSchema: {
-    prompt: {
-      type: "string",
-      description: "A coding task to complete",
+    id: resolveFreebuffAgentForModel(model),
+    displayName: "Buffy",
+    model: resolvedModel,
+    providerOptions: { data_collection: "deny" },
+    outputMode: "last_message",
+    includeMessageHistory: true,
+    inputSchema: {
+      prompt: {
+        type: "string",
+        description: "A coding task to complete",
+      },
     },
-  },
-  toolNames: [
-    "read_files",
-    "str_replace",
-    "write_file",
-    "run_terminal_command",
-    "code_search",
-    "glob",
-    "list_directory",
-    "write_todos",
-    "web_search",
-  ],
-  systemPrompt: `You are Buffy, the coding agent behind Codebuff. You help users with software engineering tasks: fixing bugs, adding functionality, refactoring, and explaining code.
+    toolNames: [
+      "read_files",
+      "str_replace",
+      "write_file",
+      "run_terminal_command",
+      "code_search",
+      "glob",
+      "list_directory",
+      "write_todos",
+      "web_search",
+      // OpenBuff extension (#108): subagent delegation, gated away upstream on
+      // free base3 tiers. The reviewer itself is registered locally by
+      // makeFreebuffAgentSuite so the spawn resolves in-process.
+      "spawn_agents",
+    ],
+    spawnableAgents: [FREEBUFF_REVIEWER_AGENT_ID],
+    systemPrompt: `You are Buffy, the coding agent behind Codebuff. You help users with software engineering tasks: fixing bugs, adding functionality, refactoring, and explaining code.
 
 - Match the project's existing conventions. Verify a library is already used in the project before employing it.
 - Prefer editing existing files over creating new ones. Make the fewest changes that address the request.
@@ -246,6 +305,7 @@ function makeFreebuffBaseAgent(model: string | undefined): AgentDefinition {
 - Use write_todos to plan and track multi-step tasks.
 - Your responses are displayed in a terminal. Keep them short and concise.
 - Don't run destructive or hard-to-undo commands (git push, resets, deploys) unless the user asks for them.
+- After completing a significant change (new feature, refactor, multi-file edit), spawn the code-reviewer subagent to review the changes, then fix any issues it finds before finishing. Skip it for trivial changes — a review pass is not free.
 
 You are running on the ${resolvedModel} model. You are the AI agent behind Freebuff, a tool where users can chat with you to code with AI for free. See freebuff.com for more information about the product.
 `,
@@ -257,11 +317,9 @@ class FreebuffRunFailure extends Data.TaggedError("FreebuffRunFailure")<{
   readonly cause: unknown;
 }> {}
 
-export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect.Effect<
-  ProviderAdapterShape<ProviderAdapterError>,
-  never,
-  Scope.Scope | Crypto.Crypto
-> =>
+export const makeFreebuffAdapter = (
+  options: MakeFreebuffAdapterOptions,
+): Effect.Effect<ProviderAdapterShape<ProviderAdapterError>, never, Scope.Scope | Crypto.Crypto> =>
   Effect.gen(function* () {
     const { config, instanceId, usageRef, fetchImpl, clientFactory } = options;
     const crypto = yield* Crypto.Crypto;
@@ -413,15 +471,15 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
               new ProviderAdapterRequestError({
                 provider: "freebuff",
                 method: "sendTurn",
-                detail:
-                  cause instanceof Error
-                    ? cause.message
-                    : "Freebuff session poll failed.",
+                detail: cause instanceof Error ? cause.message : "Freebuff session poll failed.",
               }),
           }).pipe(Effect.orElseSucceed(() => null));
           if (poll !== null) {
             if (usageRef !== undefined) {
-              usageRef.current = mergeProviderUsage(usageRef.current, usageFromSessionResponse(poll));
+              usageRef.current = mergeProviderUsage(
+                usageRef.current,
+                usageFromSessionResponse(poll),
+              );
             }
             if (poll.rateLimitsByModel !== undefined) {
               state.latestQuotaByModel = poll.rateLimitsByModel;
@@ -532,23 +590,25 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
           }
         }
 
-        const client = (clientFactory
-          ? yield* Effect.promise(() => clientFactory())
-          : new CodebuffClient({
-              apiKey: config.apiKey,
-              // Surface SDK internals on stderr: without a logger the run()
-              // promise can fail silently (invalid agent, auth, network). The SDK
-              // fires these callbacks from promise-land, outside any Effect
-              // runtime, so they go straight to stderr rather than Effect.log*.
-              logger: {
-                debug: () => {},
-                info: () => {},
-                warn: (...args: unknown[]) =>
-                  process.stderr.write(`[freebuff-sdk:warn] ${args.map(String).join(" ")}\n`),
-                error: (...args: unknown[]) =>
-                  process.stderr.write(`[freebuff-sdk:error] ${args.map(String).join(" ")}\n`),
-              } as never,
-            })) as CodebuffClient;
+        const client = (
+          clientFactory
+            ? yield* Effect.promise(() => clientFactory())
+            : new CodebuffClient({
+                apiKey: config.apiKey,
+                // Surface SDK internals on stderr: without a logger the run()
+                // promise can fail silently (invalid agent, auth, network). The SDK
+                // fires these callbacks from promise-land, outside any Effect
+                // runtime, so they go straight to stderr rather than Effect.log*.
+                logger: {
+                  debug: () => {},
+                  info: () => {},
+                  warn: (...args: unknown[]) =>
+                    process.stderr.write(`[freebuff-sdk:warn] ${args.map(String).join(" ")}\n`),
+                  error: (...args: unknown[]) =>
+                    process.stderr.write(`[freebuff-sdk:error] ${args.map(String).join(" ")}\n`),
+                } as never,
+              })
+        ) as CodebuffClient;
         const prompt = input.input;
         const previousRun = state.runState;
         const cwd = state.session.cwd;
@@ -559,10 +619,7 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
         // ── Command approval bridge (#4) ────────────────────────────────
         // Parks an approval on a promise the web UI resolves via
         // respondToRequest; auto-denies if the turn is interrupted.
-        const requestCommandApproval = (
-          command: string,
-          rawInput: unknown,
-        ): Promise<boolean> =>
+        const requestCommandApproval = (command: string, rawInput: unknown): Promise<boolean> =>
           new Promise<boolean>((resolve) => {
             const requestId = ApprovalRequestId.make(`freebuff-req-${newUuid()}`);
             state.pendingApprovals.set(requestId, {
@@ -609,14 +666,20 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
             // `freebuff_instance_id` into every chat-completion request's
             // `codebuff_metadata`. Without it the backend answers
             // `waiting_room_required` and the turn produces nothing.
-            runWithFreebuffSession(freebuffInstanceId, () =>
-              client.run({
+            runWithFreebuffSession(freebuffInstanceId, () => {
+              const suite = makeFreebuffAgentSuite(modelSelection);
+              return client.run({
                 // Pass the agent as an OBJECT, not a string id. The SDK
                 // registers object agents as local templates (keyed by id) and
                 // resolves them in-process. A string id instead falls through
                 // to a database fetch of a published agent — and the free-mode
                 // roots are not published (404), which hangs the run silently.
-                agent: makeFreebuffBaseAgent(modelSelection),
+                // `agentDefinitions` registers the suite's subagents (the
+                // same-model reviewer) as local templates alongside the root.
+                agent: suite.root,
+                ...(suite.agentDefinitions.length > 0
+                  ? { agentDefinitions: suite.agentDefinitions }
+                  : {}),
                 costMode: "free",
                 prompt,
                 ...(previousRun !== undefined ? { previousRun } : {}),
@@ -647,59 +710,59 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
                     });
                   },
                 },
-              handleStreamChunk: (chunk) => {
-                if (typeof chunk === "string") {
-                  if (chunk) {
-                    assistantText += chunk;
+                handleStreamChunk: (chunk) => {
+                  if (typeof chunk === "string") {
+                    if (chunk) {
+                      assistantText += chunk;
+                      emitFromCallback({
+                        ...baseEvent(threadId, turnId),
+                        type: "content.delta",
+                        payload: { streamKind: "assistant_text", delta: chunk },
+                      } as ProviderRuntimeEvent);
+                    }
+                    return;
+                  }
+                  if (chunk.type === "reasoning_chunk") {
                     emitFromCallback({
                       ...baseEvent(threadId, turnId),
                       type: "content.delta",
-                      payload: { streamKind: "assistant_text", delta: chunk },
+                      payload: { streamKind: "reasoning_text", delta: chunk.chunk },
                     } as ProviderRuntimeEvent);
                   }
-                  return;
-                }
-                if (chunk.type === "reasoning_chunk") {
-                  emitFromCallback({
-                    ...baseEvent(threadId, turnId),
-                    type: "content.delta",
-                    payload: { streamKind: "reasoning_text", delta: chunk.chunk },
-                  } as ProviderRuntimeEvent);
-                }
-              },
-              handleEvent: (event: PrintModeEvent) => {
-                // Error events are the ones that would otherwise vanish; the
-                // SDK reports agent failures here rather than rejecting run().
-                if (event.type === "error" || event.type === "prompt-error") {
-                  process.stderr.write(
-                    `[freebuff-sdk:event] ${JSON.stringify(event).slice(0, 400)}\n`,
-                  );
-                }
-                if (event.type === "tool_call") {
-                  emitFromCallback({
-                    ...baseEvent(threadId, turnId),
-                    type: "item.started",
-                    payload: {
-                      itemType: mapToolNameToItemType(event.toolName),
-                      title: event.toolName,
-                      data: event.input,
-                    },
-                  } as ProviderRuntimeEvent);
-                } else if (event.type === "tool_result") {
-                  emitFromCallback({
-                    ...baseEvent(threadId, turnId),
-                    type: "item.completed",
-                    payload: {
-                      itemType: mapToolNameToItemType(event.toolName),
-                      status: "completed",
-                      title: event.toolName,
-                      detail: summarizeToolOutput(event.output),
-                    },
-                  } as ProviderRuntimeEvent);
-                }
-              },
-              })
-            ),
+                },
+                handleEvent: (event: PrintModeEvent) => {
+                  // Error events are the ones that would otherwise vanish; the
+                  // SDK reports agent failures here rather than rejecting run().
+                  if (event.type === "error" || event.type === "prompt-error") {
+                    process.stderr.write(
+                      `[freebuff-sdk:event] ${JSON.stringify(event).slice(0, 400)}\n`,
+                    );
+                  }
+                  if (event.type === "tool_call") {
+                    emitFromCallback({
+                      ...baseEvent(threadId, turnId),
+                      type: "item.started",
+                      payload: {
+                        itemType: mapToolNameToItemType(event.toolName),
+                        title: event.toolName,
+                        data: event.input,
+                      },
+                    } as ProviderRuntimeEvent);
+                  } else if (event.type === "tool_result") {
+                    emitFromCallback({
+                      ...baseEvent(threadId, turnId),
+                      type: "item.completed",
+                      payload: {
+                        itemType: mapToolNameToItemType(event.toolName),
+                        status: "completed",
+                        title: event.toolName,
+                        detail: summarizeToolOutput(event.output),
+                      },
+                    } as ProviderRuntimeEvent);
+                  }
+                },
+              });
+            }),
           catch: (cause) => new FreebuffRunFailure({ cause }),
         });
 
@@ -710,17 +773,17 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
             Effect.matchEffect({
               onSuccess: (runState) =>
                 Effect.sync(() => {
-                    state.runState = runState;
-                    state.turns.push({
-                      id: turnId,
-                      items: [
-                        { type: "userMessage", content: [{ type: "text", text: prompt }] },
-                        ...(assistantText ? [{ type: "agentMessage", text: assistantText }] : []),
-                      ],
-                    });
-                    state.activeTurn = undefined;
-                    state.session = { ...state.session, status: "ready", updatedAt: nowIso() };
-                  }).pipe(
+                  state.runState = runState;
+                  state.turns.push({
+                    id: turnId,
+                    items: [
+                      { type: "userMessage", content: [{ type: "text", text: prompt }] },
+                      ...(assistantText ? [{ type: "agentMessage", text: assistantText }] : []),
+                    ],
+                  });
+                  state.activeTurn = undefined;
+                  state.session = { ...state.session, status: "ready", updatedAt: nowIso() };
+                }).pipe(
                   Effect.andThen(
                     emit({
                       ...baseEvent(threadId, turnId),
@@ -732,8 +795,7 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
               onFailure: (failure) => {
                 const cause = failure.cause;
                 const aborted =
-                  abort.signal.aborted ||
-                  (cause instanceof Error && cause.name === "AbortError");
+                  abort.signal.aborted || (cause instanceof Error && cause.name === "AbortError");
                 // Session gate rejections carry an (error code, status) pair
                 // on the thrown error; classify before any generic handling.
                 const gateCode = classifyFreebuffGate(cause);
@@ -799,9 +861,7 @@ export const makeFreebuffAdapter = (options: MakeFreebuffAdapterOptions): Effect
         }),
       );
 
-    const interruptTurn: ProviderAdapterShape<ProviderAdapterError>["interruptTurn"] = (
-      threadId,
-    ) =>
+    const interruptTurn: ProviderAdapterShape<ProviderAdapterError>["interruptTurn"] = (threadId) =>
       Effect.suspend(() => {
         const state = sessions.get(threadId);
         if (!state) return Effect.fail<ProviderAdapterError>(sessionNotFound(threadId));
