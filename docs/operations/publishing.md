@@ -1,0 +1,39 @@
+# Publishing `@princetheprogrammerbtw/openbuff`
+
+The package publishes from a deterministically staged tree, gated by CI smoke — never from the workspace directly.
+
+## The gate
+
+**Publish gate** (`.github/workflows/publish-gate.yml`, `workflow_dispatch`) proves, on the exact packed artifact:
+
+1. installs clean in user position (fresh dir, npm's default script gating),
+2. `npm audit` reports **0 vulnerabilities**,
+3. `openbuff serve` boots and serves `/` and `/welcome` with HTTP 200,
+4. the installed CLI's version matches the manifest.
+
+A red gate is a hard stop. Both historical escapes — the missing-README page (#93) and the fatal `node-pty@1.1.0` Linux boot (#96) — were catchable by this smoke; nothing ships without it.
+
+## Release procedure
+
+```bash
+# 1. Build + stage (stage script fails closed on pin assertions).
+pnpm build
+pnpm --filter @princetheprogrammerbtw/openbuff run build:bundle
+node --experimental-strip-types scripts/publish-prepare.ts
+
+# 2. Gate: run the workflow on this commit and wait for green.
+gh workflow run publish-gate
+gh run watch   # … must end green
+
+# 3. Publish (2FA-enforced account: use a granular automation token).
+cd .publish-stage && npm publish --access public
+
+# 4. Live verify: registry doc + a fresh `npm install <pkg>@latest` + boot probe.
+```
+
+## Mechanism notes
+
+- **Staging** (`scripts/publish-prepare.ts`): rewrites pnpm `catalog:` specifiers to verbatim versions (pnpm 11 cannot pack this workspace package), drops devDependencies, copies the built web client to `dist/client`, copies `README.md` (fails closed if missing — npm renders the page from the tarball root, #93), and asserts the bundled closure is advisory-free (`scripts/install-security.ts` scans every manifest in the tree, #97).
+- **`bundleDependencies: ["@codebuff/sdk"]`**: npm 12 removed shrinkwraps and ignores dependency-position overrides, so the pinned clean closure ships physically in the tarball.
+- **`node-pty@1.2.0-beta.15`**: pinned exactly because that tarball ships `prebuilds/linux-*` — the CLI boots with zero install scripts under npm's gating.
+- Version bumps happen in `apps/server/package.json` **before** staging (the stage snapshot is a copy — a post-stage bump packs a stale version).
