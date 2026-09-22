@@ -12,16 +12,16 @@ This repository is built by an **agent fleet**, not ad-hoc commits. Every change
 
 ### 1.1 Fleet roster (see `agents/` for full briefs)
 
-| Agent | Role | Acts as |
-|---|---|---|
-| **Builder** | Writes code + tests, follows the PR loop | committer (co-author: the-ai-developer) |
-| **Reviewer** (`the-ai-developer`) | Reviews every PR; requests changes before approval | PR reviewer |
-| **Architect** | Owns ADRs, boundaries, performance budget | issue author `architect` |
-| **Protocol** | Owns the Freebuff wire contract, upstream deltas | issue author `protocol` |
-| **Security** | Threat-models diffs, guards secrets/creds | issue author `security` |
-| **Perf** | Renders perf regressions; proposes perf fixes | issue author `perf` |
-| **Docs** | Keeps docs truthful; runs the unslop pass | issue author `docs` |
-| **Operator** | CI, releases, branch hygiene, dashboards | issue author `operator` |
+| Agent                             | Role                                               | Acts as                                 |
+| --------------------------------- | -------------------------------------------------- | --------------------------------------- |
+| **Builder**                       | Writes code + tests, follows the PR loop           | committer (co-author: the-ai-developer) |
+| **Reviewer** (`the-ai-developer`) | Reviews every PR; requests changes before approval | PR reviewer                             |
+| **Architect**                     | Owns ADRs, boundaries, performance budget          | issue author `architect`                |
+| **Protocol**                      | Owns the Freebuff wire contract, upstream deltas   | issue author `protocol`                 |
+| **Security**                      | Threat-models diffs, guards secrets/creds          | issue author `security`                 |
+| **Perf**                          | Renders perf regressions; proposes perf fixes      | issue author `perf`                     |
+| **Docs**                          | Keeps docs truthful; runs the unslop pass          | issue author `docs`                     |
+| **Operator**                      | CI, releases, branch hygiene, dashboards           | issue author `operator`                 |
 
 Any worker agent may spawn subagents for research/verification, but **only Builder commits** and **only Reviewer approves**. Opinions route through issues.
 
@@ -132,5 +132,20 @@ An empty database is a bad test. Seed your worktree `.t3` by copying from `~/.t3
 - Every commit co-authored by **the-ai-developer only** (trailer in 1.2.6).
 - Vendor names never appear in commit subjects or PR titles; bodies use role names for dependencies.
 - Merge strategy: **merge commit**; squash/rebase prohibited.
-- Reviewer of record: **the-ai-developer** on every PR.
+- Reviewer of record: **the-ai-developer** on every PR (rubric below).
 - Issues are the unit of work; PRs reference exactly one issue; research lands in the issue, evidence lands in the PR.
+
+### Reviewer rubric (the merge bar)
+
+The reviewer is not a separate product or bot — it is the same engineering discipline operating under a different hat, with a different duty: attack the work instead of defend it. What must be durable is this rubric, not a tool.
+
+Run in order; a step can only be passed, not skipped:
+
+1. **Charter check** — conventional subject ≤ 6 words, exactly one co-author (the-ai-developer), no vendor/generated wording, merge-commit policy respected.
+2. **Linkage check** — the PR references exactly one open issue; the issue's acceptance criteria are each addressed or explicitly waived with a reason.
+3. **RED-first check** — every behavior claim has a test that failed before the change (or, for pure docs/config, a before-state capture). "It passed" without a failing predecessor is unproven.
+4. **Finding disposition** — every review finding (bot or human) is fixed or rebutted **with evidence**; silence is not disposition. Valid findings get a fix commit, not an argument; invalid ones get the evidence that kills them.
+5. **Artifact-level proof** — the proof matches the claim's level: code claims need runtime output, install claims need a clean-tree install of the packed artifact, publish claims need the registry. A green build alone proves nothing about behavior.
+6. **Approval** — only after 1–5: the-ai-developer approves with a disposition summary. Merge bar = approval + all gates green + zero undispositioned findings.
+
+Bot reviewers (e.g. CodeRabbit) are **findings sources, never approvers**; their state does not gate the merge bar, their findings do.
