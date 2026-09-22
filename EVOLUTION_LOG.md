@@ -192,3 +192,7 @@ Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-o
 - **Worked**: pre-merge logic proof produced a real actionable report (upstream touched our wire-truth file THIS week); live failures each fixed through the loop within one PR; final dispatch green + self-created #116.
 - **FAILED TWICE (law: twice = recorded)**: (1) pre-merge proof executed a RE-IMPLEMENTATION, not the shipped script — the shipped workflow referenced a `/tmp` drafting artifact (run 35743775590). (2) missing label on labeled-issue creation — same class as #96 (run 35744916638). Rules now reusable: prove the SHIPPED artifact verbatim (copy the script, don't re-type it); labeled-issue workflows self-heal labels.
 - **Graph nodes updated**: tracker row added.
+- **What I tried** (2026-09-22): port the four CLI-selectable free models from the tracker's findings.
+- **Worked**: research rejected 2 of 6 candidates on the twin rule BEFORE building; the #109 same-model contract auto-covered the new entries with zero extra code (designing contracts that iterate instead of enumerate pays again).
+- **Failed**: local proof ran the server suite but not packages/contracts' own — CI caught the stale "exactly the eight" pin. Rule: when changing a contract, grep EVERY package for pins on its shape (`toHaveLength(8)`, literal key lists), run those suites too.
+- **Graph nodes updated**: models row added.
