@@ -188,3 +188,7 @@ Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-o
 - **Failed**: `pnpm` not on host PATH (mise-managed, only npx pnpm@11.10.0 works); backgrounded serve holds the tool shell open — probe listeners with follow-up ground-truth commands (ss/curl), never inline waits.
 - **Lesson as reusable rule**: CI config is provable pre-merge by executing its steps verbatim locally; a workflow that "looks right" is UNVERIFIED until its steps have run somewhere real.
 - **Graph nodes updated**: publish-gate row added.
+- **What I tried** (2026-09-22): land the #101 tracker with pre-merge proof; live CI failed twice anyway.
+- **Worked**: pre-merge logic proof produced a real actionable report (upstream touched our wire-truth file THIS week); live failures each fixed through the loop within one PR; final dispatch green + self-created #116.
+- **FAILED TWICE (law: twice = recorded)**: (1) pre-merge proof executed a RE-IMPLEMENTATION, not the shipped script — the shipped workflow referenced a `/tmp` drafting artifact (run 35743775590). (2) missing label on labeled-issue creation — same class as #96 (run 35744916638). Rules now reusable: prove the SHIPPED artifact verbatim (copy the script, don't re-type it); labeled-issue workflows self-heal labels.
+- **Graph nodes updated**: tracker row added.
