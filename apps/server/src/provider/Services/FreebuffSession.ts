@@ -156,6 +156,25 @@ export interface FreebuffSessionFreebucks {
     readonly amount: number;
     readonly available: boolean;
   };
+  /** Per-model policy taglines (issue #129, wire pass-through). */
+  readonly priceNotices?: Record<string, string>;
+  /** Recurring server-owned price windows (issue #129, wire pass-through). */
+  readonly offPeak?: Record<
+    string,
+    {
+      readonly startHourUtc: number;
+      readonly endHourUtc: number;
+      readonly price: number;
+      readonly regularPrice: number;
+    }
+  >;
+  /** Scheduled changes announced by the server (issue #129, wire pass-through). */
+  readonly priceChanges?: Array<{
+    readonly at: string;
+    readonly modelId: string;
+    readonly price: number;
+    readonly tagline: string;
+  }>;
 }
 
 /**

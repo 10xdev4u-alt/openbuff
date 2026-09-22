@@ -14,12 +14,18 @@
  *
  * @module components/chat/modelPickerPricing
  */
-import { firstTabListPriceFor, type FreebuffProviderFreebucks } from "@t3tools/contracts";
+import {
+  applyFreebucksPriceChanges,
+  firstTabListPriceFor,
+  type FreebuffProviderFreebucks,
+} from "@t3tools/contracts";
 
 export interface FreebuffPickerPrice {
   readonly price: number;
   /** Strike-through target; undefined means "no discount to show". */
   readonly listPrice?: number;
+  /** Server-authored policy prose (e.g. off-peak window), when one applies. */
+  readonly notice?: string;
 }
 
 export function freebuffPickerPricingForInstance(
@@ -29,14 +35,39 @@ export function freebuffPickerPricingForInstance(
   if (!freebucks) {
     return new Map();
   }
+  // Project the server's price policy (off-peak windows, dated changes)
+  // BEFORE reading prices: the wire `prices` alone go stale the moment a
+  // window activates. Absent policy fields make this a structural no-op
+  // (the util returns the same reference it was given).
+  const projected = applyFreebucksPriceChanges(
+    {
+      prices: freebucks.prices,
+      ...(freebucks.listPrices ? { listPrices: freebucks.listPrices } : {}),
+      ...(freebucks.priceNotices ? { priceNotices: freebucks.priceNotices } : {}),
+      ...(freebucks.priceChanges ? { priceChanges: freebucks.priceChanges } : {}),
+      ...(freebucks.firstTabDiscount ? { firstTabDiscount: freebucks.firstTabDiscount } : {}),
+      ...(freebucks.offPeak ? { offPeak: freebucks.offPeak } : {}),
+    },
+    Date.now(),
+  );
   const out = new Map<string, FreebuffPickerPrice>();
   for (const slug of modelSlugs) {
-    const price = freebucks.prices[slug];
+    const price = projected.prices[slug];
     if (price === undefined) {
       continue;
     }
-    const listPrice = firstTabListPriceFor(freebucks, slug);
-    out.set(slug, listPrice !== undefined ? { price, listPrice } : { price });
+    const listPrice = firstTabListPriceFor(projected, slug);
+    const notice = projected.priceNotices?.[slug];
+    out.set(
+      slug,
+      listPrice !== undefined || notice !== undefined
+        ? {
+            price,
+            ...(listPrice !== undefined ? { listPrice } : {}),
+            ...(notice ? { notice } : {}),
+          }
+        : { price },
+    );
   }
   return out;
 }

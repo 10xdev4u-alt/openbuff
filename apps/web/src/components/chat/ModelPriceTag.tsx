@@ -10,7 +10,10 @@ import type { FreebuffPickerPrice } from "./modelPickerPricing";
 
 export function ModelPriceTag({ pricing }: { pricing: FreebuffPickerPrice }) {
   return (
-    <span className="shrink-0 text-right text-[11px] leading-none tabular-nums text-muted-foreground/70">
+    <span
+      className="shrink-0 text-right text-[11px] leading-none tabular-nums text-muted-foreground/70"
+      {...(pricing.notice ? { title: pricing.notice } : {})}
+    >
       {pricing.listPrice !== undefined ? (
         <span className="mr-1 line-through opacity-70">{pricing.listPrice}</span>
       ) : null}

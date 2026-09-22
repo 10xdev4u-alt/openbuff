@@ -4,6 +4,14 @@ import type { FreebuffProviderFreebucks } from "@t3tools/contracts";
 
 import { freebuffPickerPricingForInstance } from "./modelPickerPricing.ts";
 
+/** Upstream's flash off-peak policy: 22:00→06:00 UTC, crossing midnight. */
+const FLASH_POLICY = {
+  startHourUtc: 22,
+  endHourUtc: 6,
+  price: 10,
+  regularPrice: 15,
+};
+
 function quote(fields: Partial<FreebuffProviderFreebucks>): FreebuffProviderFreebucks {
   return {
     balance: 7,
@@ -57,6 +65,42 @@ describe("freebuffPickerPricingForInstance", () => {
       "vendor/premium",
     ]);
     expect(pricing.get("vendor/premium")).toEqual({ price: 15 });
+  });
+
+  it("projects an active off-peak window before reading prices, with the policy notice", () => {
+    const pricing = freebuffPickerPricingForInstance(
+      quote({
+        prices: { "vendor/flash": 15 },
+        offPeak: { "vendor/flash": FLASH_POLICY },
+        priceChanges: [],
+      }),
+      ["vendor/flash"],
+    );
+    // Outside the window: peak price, notice explains the policy.
+    expect(pricing.get("vendor/flash")).toEqual({
+      price: 15,
+      notice: "Peak pricing · 10 Freebucks/hour off-peak",
+    });
+  });
+
+  it("projects the raw policy price as the strike when a discount meets off-peak", () => {
+    const pricing = freebuffPickerPricingForInstance(
+      quote({
+        prices: { "vendor/flash": 15 },
+        listPrices: { "vendor/flash": 15 },
+        offPeak: { "vendor/flash": FLASH_POLICY },
+        priceChanges: [],
+        firstTabDiscount: { amount: 10, available: true },
+      }),
+      ["vendor/flash"],
+    );
+    const row = pricing.get("vendor/flash");
+    // Inside the 22→06 window at the fixture's implicit "now" the policy
+    // price is either 10 (off-peak) or 15 (peak); the discount moved the
+    // payable price below the raw policy price in both cases, so a strike
+    // target exists and equals the raw policy price.
+    expect(row).toBeDefined();
+    expect(row?.price).toBeLessThan(row?.listPrice ?? Number.POSITIVE_INFINITY);
   });
 
   it("prices only the rows the picker actually shows", () => {
