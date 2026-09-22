@@ -183,3 +183,8 @@ Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-o
 - **Failed**: three syntax stumbles restructuring the `Effect.tryPromise` arrow block (comment-glued call, stray trailing comma turning return into comma-operator, NodeOS/NodeOs naming). Caught each by typecheck + balance-count script instead of eyeballing.
 - **Lesson as reusable rule**: when restructuring big call blocks, run a paren-balance count after; a trailing comma after `client.run({...})` inside an arrow body is a comma-OPERATOR, not an object separator.
 - **Graph nodes updated**: subagent architecture row added.
+- **What I tried** (2026-09-22): land the #100 publish gate with pre-merge proof despite workflow_dispatch being default-branch-only.
+- **Worked**: ran the workflow's exact step sequence locally on the branch state (build→stage→pack→clean install→audit 0→version==manifest→boot→200s), then the first live dispatch on main completed:success — proof before and after merge.
+- **Failed**: `pnpm` not on host PATH (mise-managed, only npx pnpm@11.10.0 works); backgrounded serve holds the tool shell open — probe listeners with follow-up ground-truth commands (ss/curl), never inline waits.
+- **Lesson as reusable rule**: CI config is provable pre-merge by executing its steps verbatim locally; a workflow that "looks right" is UNVERIFIED until its steps have run somewhere real.
+- **Graph nodes updated**: publish-gate row added.
