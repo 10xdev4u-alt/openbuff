@@ -116,6 +116,7 @@ describe("dev-toolchain advisory pins (#99)", () => {
       NodePath.join(import.meta.dirname, "..", "pnpm-lock.yaml"),
       "utf8",
     );
+    const lockLines = lock.split("\n");
     for (const pin of [
       "brace-expansion@1.1.18",
       "nanoid@3.3.18",
@@ -127,9 +128,14 @@ describe("dev-toolchain advisory pins (#99)", () => {
       "path-to-regexp@6.3.0",
       "electron@41.10.7",
     ]) {
+      // Match the package's own mapping key (`name@version:` or the peer
+      // variant `name@version(peers):`), never a dependency reference inside
+      // another package's key like `postcss@8.5.15(nanoid@3.3.18):`.
+      const escaped = pin.replace(/[.@]/g, "\\$&");
+      const mappingKey = new RegExp(`^\\s*'?${escaped}(\\([^)]*\\))?:`);
       assert.ok(
-        lock.includes(pin),
-        `lockfile must resolve ${pin} (override not applied or install stale)`,
+        lockLines.some((line) => mappingKey.test(line)),
+        `lockfile must map ${pin} (override not applied or install stale)`,
       );
     }
   });
