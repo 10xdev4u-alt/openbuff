@@ -27,11 +27,11 @@ export interface FreebuffFirstTabDiscount {
 export interface FreebucksPriceQuote {
   balance: number;
   /** Session price per model id; only metered models appear. */
-  prices: Record<string, number>;
+  prices: Readonly<Record<string, number>>;
   planId: string | null;
   /** Regular prices, present once the wire supplies them or a discount is applied. */
-  listPrices?: Record<string, number>;
-  firstTabDiscount?: FreebuffFirstTabDiscount;
+  listPrices?: Readonly<Record<string, number>> | undefined;
+  firstTabDiscount?: FreebuffFirstTabDiscount | undefined;
 }
 
 export const discountedSessionPrice = (price: number, discount: number): number =>

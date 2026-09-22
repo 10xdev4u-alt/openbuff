@@ -214,6 +214,15 @@ export const FreebuffProviderFreebucks = Schema.Struct({
   }),
   planId: Schema.NullOr(Schema.String),
   prices: Schema.Record(Schema.String, Schema.Number),
+  /** Regular prices (pre-discount base) once the wire supplies them (#122/#126). */
+  listPrices: Schema.optional(Schema.Record(Schema.String, Schema.Number)),
+  /** The first-tab discount offer as the wire carries it (#122/#126). */
+  firstTabDiscount: Schema.optional(
+    Schema.Struct({
+      amount: Schema.Number,
+      available: Schema.Boolean,
+    }),
+  ),
 });
 
 /**
@@ -222,9 +231,7 @@ export const FreebuffProviderFreebucks = Schema.Struct({
  * cycle, and the UI must clear its stale balance instead of showing it.
  */
 export const FreebuffProviderUsage = Schema.Struct({
-  rateLimitsByModel: Schema.optional(
-    Schema.Record(Schema.String, FreebuffProviderQuotaRow),
-  ),
+  rateLimitsByModel: Schema.optional(Schema.Record(Schema.String, FreebuffProviderQuotaRow)),
   freeWindows: Schema.optional(FreebuffProviderFreeWindows),
   // NullOr, not plain: `null` on the wire means "meter exists, refresh failed"
   // and must reach the UI as null so stale balances get cleared.

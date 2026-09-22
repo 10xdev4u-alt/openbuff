@@ -8,6 +8,7 @@ import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { memo, useMemo, useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { ChevronRightIcon, SearchIcon } from "lucide-react";
 import { ModelListRow } from "./ModelListRow";
+import { freebuffPickerPricingForInstance, type FreebuffPickerPrice } from "./modelPickerPricing";
 import { ModelPickerSidebar } from "./ModelPickerSidebar";
 import {
   modelPickerLegacySectionKey,
@@ -53,6 +54,8 @@ type ModelPickerItem = {
   instanceAccentColor?: string | undefined;
   continuationGroupKey?: string | undefined;
   isLegacy?: boolean | undefined;
+  /** Freebuff only: quote-derived pricing for the row (issue #126). */
+  pricing?: FreebuffPickerPrice;
 };
 
 const EMPTY_MODEL_JUMP_LABELS = new Map<string, string>();
@@ -216,6 +219,16 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
         continue;
       }
       for (const model of models) {
+        // Freebuff rows carry quote pricing (strike-through discount views,
+        // issue #126) joined from the same snapshot the cockpit reads.
+        // The pricing map prices exactly the instance's model slugs, so the
+        // lookup only ever hits for freebuff rows.
+        const pricing =
+          entry.driverKind === "freebuff"
+            ? freebuffPickerPricingForInstance(entry.snapshot.usage?.freebucks, [model.slug]).get(
+                model.slug,
+              )
+            : undefined;
         out.push({
           slug: model.slug,
           name: model.name,
@@ -229,6 +242,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
           ...(entry.continuationGroupKey
             ? { continuationGroupKey: entry.continuationGroupKey }
             : {}),
+          ...(pricing ? { pricing } : {}),
         });
       }
     }
@@ -768,6 +782,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                         preferShortName={!isLocked}
                         useTriggerLabel={false}
                         showNewBadge={isModelPickerNewModel(model.driverKind, model.slug)}
+                        pricing={model.pricing}
                         jumpLabel={modelJumpLabelByKey.get(modelKey) ?? null}
                         disabledReason={disabledReason}
                         onToggleFavorite={() => toggleFavorite(model.instanceId, model.slug)}
