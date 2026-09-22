@@ -1,0 +1,84 @@
+name: Upstream sync tracker
+
+# Issue #101: our fork's histories are UNRELATED to upstream (fresh seed,
+# verified: `git merge-base` empty) — `git merge upstream` is structurally
+# impossible, so divergence is tracked as PORT WORK, not merge conflicts.
+#
+# Weekly (Mondays 06:00 UTC) + on demand:
+#   1. fetch upstream/main
+#   2. measure upstream velocity + changed files in the last 7 days
+#   3. map upstream changes onto OUR watched modules (semantic hits)
+#   4. open or update the tracking issue with the numbers
+#
+# Never merges anything — human/agent port work happens through the normal
+# factory loop.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/CodebuffAI/freebuff.git
+          git fetch upstream main --no-tags
+
+      - name: Measure divergence
+        run: |
+          {
+            echo "## Upstream sync report — $(date -u +%F)"
+            echo
+            echo "upstream head: $(git rev-parse --short upstream/main)"
+            echo "- upstream commits (7d): $(git rev-list --count --since='7 days ago' upstream/main)"
+            CHANGED=$(git diff --name-only "$(git rev-list -1 --before='1 week' upstream/main)" upstream/main)
+            echo "- upstream files changed (7d): $(echo "$CHANGED" | grep -c .)"
+            echo "- path overlap with our tree: $(comm -12 <(echo "$CHANGED" | sort) <(git ls-files | sort) | grep -c . || true)"
+            echo
+            echo "### Semantic watch hits (upstream change → our module)"
+            WATCH_FILE=/tmp/watch-map.txt
+            while IFS='|' read -r PREFIX OURS; do
+              HITS=$(echo "$CHANGED" | grep -c "^$PREFIX" || true)
+              if [ "$HITS" -gt 0 ]; then
+                echo "- \`$PREFIX\` → **$OURS**: $HITS file(s) changed upstream"
+              fi
+            done < "$WATCH_FILE"
+            echo
+            echo "### Protected paths (ours must survive any port)"
+            echo '```'
+            cat .github/sync-protected-paths.txt
+            echo '```'
+            echo
+            echo "### Port-work candidates"
+            echo "- Review watch hits above through the factory loop (research → issue → PR)."
+            echo "- Unrelated histories: content-level porting only — never merge."
+          } > /tmp/report.md
+          cat /tmp/report.md
+
+      - name: Create or update tracking issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NUMBER=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --label upstream-sync --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$NUMBER" ] && [ "$NUMBER" != "null" ]; then
+            gh issue comment "$NUMBER" --repo "$GITHUB_REPOSITORY" \
+              --body-file /tmp/report.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "chore: weekly upstream sync tracking" \
+              --label upstream-sync \
+              --body-file /tmp/report.md
+          fi

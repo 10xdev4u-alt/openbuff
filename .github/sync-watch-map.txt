@@ -1,0 +1,14 @@
+# Semantic watch map — upstream prefix → our module it impacts (#101).
+#
+# Upstream's repo layout differs from ours (agents/, common/ at their root;
+# nested in ours), so raw path overlap under-reports. The tracker greps each
+# upstream-changed prefix against this map; a hit means our module's source
+# of truth may have moved and needs a port review through the factory loop.
+agents/|provider agent suite (FreebuffAdapter.subagents.test.ts, contracts model map)
+common/src/types/freebuff-session.ts|wire truth: FreebuffSession.ts + admission tests
+common/src/constants/free-agents.ts|free-tier agent/reviewer pairing map (contracts)
+common/src/constants/freebuff-models.ts|free model ids + DEFAULT_FREEBUFF_FREE_MODEL (contracts)
+apps/server/src/provider/|server provider drivers/services (whole subtree)
+packages/contracts/src/|shared contracts (model pairing, receipts)
+scripts/publish-prepare.ts|upstream packaging script — diff against ours before porting
+.github/workflows/|upstream CI conventions worth mirroring

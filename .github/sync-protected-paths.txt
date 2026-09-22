@@ -1,0 +1,18 @@
+# Protected paths — ours must survive any upstream port (#101).
+#
+# These encode OpenBuff's identity and divergent behavior. When porting
+# upstream changes, re-apply ours on top; a port that silently drops one of
+# these is a regression, not a sync.
+README.md
+AGENTS.md
+docs/KNOWLEDGE_GRAPH.md
+docs/operations/publishing.md
+.github/workflows/publish-gate.yml
+.github/workflows/upstream-sync.yml
+scripts/publish-prepare.ts
+scripts/install-security.ts
+apps/server/src/provider/Services/FreebuffAdapter.ts
+apps/server/src/provider/Services/FreebuffAdapter.subagents.test.ts
+apps/server/src/packageName.ts
+apps/server/package.json
+pnpm-workspace.yaml
