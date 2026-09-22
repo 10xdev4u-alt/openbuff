@@ -2,6 +2,7 @@
 import * as NodeFS from "node:fs";
 import * as NodeOs from "node:os";
 import * as NodePath from "node:path";
+import * as Yaml from "yaml";
 
 import { assert, describe, it } from "@effect/vitest";
 
@@ -68,6 +69,75 @@ describe("install security contract", () => {
   it("stays the scoped npm identity", () => {
     const manifest = readServerManifest();
     assert.strictEqual(manifest["name"], NPM_PACKAGE_NAME);
+  });
+});
+
+/**
+ * Dev-toolchain advisory pins (#99).
+ *
+ * The published artifact is clean (audited in #96/#97), but the dev
+ * workspace carries 25 advisories (1 critical, 19 high, 5 moderate —
+ * 2026-09-22 census). These overrides force every vulnerable nested copy to
+ * its minimum patched release. Each pin was verified to exist on the
+ * registry before landing; do not bump them casually — re-run
+ * `pnpm audit` and this suite after any change.
+ */
+describe("dev-toolchain advisory pins (#99)", () => {
+  const workspace = (): Record<string, unknown> =>
+    Yaml.parse(
+      NodeFS.readFileSync(NodePath.join(import.meta.dirname, "..", "pnpm-workspace.yaml"), "utf8"),
+    ) as Record<string, unknown>;
+
+  const readOverrides = (): Record<string, string> => {
+    const overrides = workspace()["overrides"] as Record<string, string>;
+    const expected: Array<[string, string]> = [
+      ["brace-expansion@^1.1.11", "1.1.18"],
+      ["nanoid@^3", "3.3.18"],
+      ["postcss@^8", "8.5.23"],
+      ["browserslist@^4", "4.28.7"],
+      ["js-yaml@^3", "3.15.2"],
+      ["baseline-browser-mapping", "2.11.0"],
+      ["fast-uri", "3.1.6"],
+      ["path-to-regexp", "6.3.0"],
+      ["electron", "41.10.7"],
+    ];
+    const missing = expected.filter(([key, version]) => overrides[key] !== version);
+    assert.deepStrictEqual(missing, [], `overrides missing or wrong: ${JSON.stringify(missing)}`);
+    return overrides;
+  };
+
+  it("pins every advisory with a published fix (audit census 2026-09-22)", () => {
+    readOverrides();
+  });
+
+  it("resolves the locked tree to the pinned versions after install", () => {
+    readOverrides();
+    const lock = NodeFS.readFileSync(
+      NodePath.join(import.meta.dirname, "..", "pnpm-lock.yaml"),
+      "utf8",
+    );
+    const lockLines = lock.split("\n");
+    for (const pin of [
+      "brace-expansion@1.1.18",
+      "nanoid@3.3.18",
+      "postcss@8.5.23",
+      "browserslist@4.28.7",
+      "js-yaml@3.15.2",
+      "baseline-browser-mapping@2.11.0",
+      "fast-uri@3.1.6",
+      "path-to-regexp@6.3.0",
+      "electron@41.10.7",
+    ]) {
+      // Match the package's own mapping key (`name@version:` or the peer
+      // variant `name@version(peers):`), never a dependency reference inside
+      // another package's key like `postcss@8.5.15(nanoid@3.3.18):`.
+      const escaped = pin.replace(/[.@]/g, "\\$&");
+      const mappingKey = new RegExp(`^\\s*'?${escaped}(\\([^)]*\\))?:`);
+      assert.ok(
+        lockLines.some((line) => mappingKey.test(line)),
+        `lockfile must map ${pin} (override not applied or install stale)`,
+      );
+    }
   });
 });
 
