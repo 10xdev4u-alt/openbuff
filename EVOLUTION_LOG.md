@@ -163,6 +163,7 @@ Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-o
 **What I tried**: fix the 8-advisory user install via manifest `overrides` (dep position) → npm-shrinkwrap.json → bundleDependencies.
 
 **What worked/failed + evidence**:
+
 - FAILED: `overrides` inside a published dependency are IGNORED by npm — my scratch-tree "win" was a false fix (overrides only bind at the user's project root). Caught by re-proving on the packed artifact in a fresh tree: vulnerable copies returned.
 - FAILED: `npm-shrinkwrap.json` — npm 12 removed it from published tarballs (packlist hard-excludes; verified in `publish --dry-run`).
 - WORKED: `bundleDependencies: ["@codebuff/sdk"]` — the official npm 12 replacement. Stage installs WITH overrides, bundle ships pre-resolved; arborist extracts as-is (edge-repair disproven by experiment). User audit 8 → 0.
@@ -170,4 +171,10 @@ Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-o
 - Meta: CodeRabbit's Major (root-only pin assertions) was valid — defense fixed with a tree-wide scanner + negative tests.
 
 **Lesson as reusable rule**: Never trust a dependency-position override fix until proven on the PACKED artifact installed in USER position; npm 12's only shipped-tree mechanism is bundleDependencies; every security assertion must cover nested copies, not root manifests.
+
 - **Graph nodes updated**: install-security row (2026-09-20) added.
+- **What I tried** (2026-09-22 lap): kill all 25 dev-tree advisories (#99). Override sweep first (9 pins, 25→3), then the toolchain bump for the exact-pinned vitest family (3→0).
+- **Worked**: overrides for range-admitting deps; vite-plus 0.3.3 as the ONLY path to vitest 4.1.11 (exact-pinned by the toolchain — override beneath it is impossible). Contract regex learned pnpm lock quoting: keys are `'name@ver':` (quoted) with peer-suffix variants — bare `lock.includes(pin)` matches dependency references (CodeRabbit Minor, valid, fixed).
+- **Failed**: assumed `pnpm audit --json` metadata shape from memory — `metadata.vulnerabilities` undefined (pnpm's shape differs from npm's); read the raw output instead. Also let npx interception confusion burn a command (audit ran under our own published package).
+- **Lesson as reusable rule**: exact-pinned transitive vulns are only reachable through the pinning package's own upgrade; lockfile assertions must match mapping KEYS, never substrings; audit JSON shape is reader-specific — parse what's actually there.
+- **Graph nodes updated**: #99/#102/#105 rows added.
