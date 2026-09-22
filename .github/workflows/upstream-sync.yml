@@ -71,6 +71,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          gh label create upstream-sync --repo "$GITHUB_REPOSITORY" \
+            --color 5319E7 --description "Weekly upstream divergence tracking" 2>/dev/null || true
           NUMBER=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
             --label upstream-sync --json number --jq '.[0].number' 2>/dev/null || true)
           if [ -n "$NUMBER" ] && [ "$NUMBER" != "null" ]; then
