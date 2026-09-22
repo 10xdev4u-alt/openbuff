@@ -13,6 +13,8 @@ import { Kbd } from "../ui/kbd";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
 import { modelPickerModelKey } from "./modelPickerKeys";
+import type { FreebuffPickerPrice } from "./modelPickerPricing";
+import { ModelPriceTag } from "./ModelPriceTag";
 
 export const ModelListRow = memo(function ModelListRow(props: {
   index: number;
@@ -34,6 +36,13 @@ export const ModelListRow = memo(function ModelListRow(props: {
   preferShortName?: boolean;
   useTriggerLabel?: boolean;
   showNewBadge?: boolean;
+  /**
+   * Quote-derived pricing for freebuff rows (issue #126). Rendered
+   * right-aligned; a `listPrice` draws struck through beside the effective
+   * price. Undefined for every other driver and for rows the quote
+   * doesn't price — those rows render unchanged.
+   */
+  pricing?: FreebuffPickerPrice | undefined;
   jumpLabel?: string | null;
   disabledReason?: string | null;
   onToggleFavorite: () => void;
@@ -87,6 +96,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
+        {props.pricing ? <ModelPriceTag pricing={props.pricing} /> : null}
         {props.jumpLabel ? (
           <Kbd className="h-4 min-w-0 rounded-sm px-1.5 text-[10px]">{props.jumpLabel}</Kbd>
         ) : null}
