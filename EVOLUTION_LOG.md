@@ -178,3 +178,8 @@ Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-o
 - **Failed**: assumed `pnpm audit --json` metadata shape from memory — `metadata.vulnerabilities` undefined (pnpm's shape differs from npm's); read the raw output instead. Also let npx interception confusion burn a command (audit ran under our own published package).
 - **Lesson as reusable rule**: exact-pinned transitive vulns are only reachable through the pinning package's own upgrade; lockfile assertions must match mapping KEYS, never substrings; audit JSON shape is reader-specific — parse what's actually there.
 - **Graph nodes updated**: #99/#102/#105 rows added.
+- **What I tried** (2026-09-22): answer "why no subagents in Freebuff / where did reviewers go" with code evidence, then ship the capability in OpenBuff.
+- **Worked**: tier archaeology in the upstream snapshot (base3's toolNames comment documents the deliberate substitution); same-model reviewer inside the local template suite; `generateInitialRunState` as offline runtime-acceptance proof.
+- **Failed**: three syntax stumbles restructuring the `Effect.tryPromise` arrow block (comment-glued call, stray trailing comma turning return into comma-operator, NodeOS/NodeOs naming). Caught each by typecheck + balance-count script instead of eyeballing.
+- **Lesson as reusable rule**: when restructuring big call blocks, run a paren-balance count after; a trailing comma after `client.run({...})` inside an arrow body is a comma-OPERATOR, not an object separator.
+- **Graph nodes updated**: subagent architecture row added.
