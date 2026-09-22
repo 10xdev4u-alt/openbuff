@@ -18,7 +18,12 @@ import {
 } from "../apps/server/src/provider/Services/FreebuffSession.ts";
 
 const credPath = path.join(os.homedir(), ".config/manicode/credentials.json");
-const creds = JSON.parse(fs.readFileSync(credPath, "utf8")) as {
+const parsedCreds: unknown = JSON.parse(fs.readFileSync(credPath, "utf8"));
+if (typeof parsedCreds !== "object" || parsedCreds === null) {
+  console.error("malformed credentials file:", credPath);
+  process.exit(1);
+}
+const creds = parsedCreds as {
   default?: { authToken?: string; email?: string };
 };
 const token = creds.default?.authToken;
@@ -31,8 +36,11 @@ console.log("identity:", creds.default?.email ?? "unknown");
 // Sticky discipline (the design the adapter implements): the FIRST-ever
 // admission opts OUT — nothing has been offered yet. Forcing the opt-in
 // without a prior quote earns `first_tab_discount_changed` from the server
-// (observed live 2026-09-23), which validates the gate exactly.
+// (observed live 2026-09-22 UTC), which validates the gate exactly.
 const admission = await establishFreebuffSession(token, { firstTabDiscount: false });
+// Note: the live capture this probe printed on 2026-09-22 UTC (see issue
+// #137 and the graph row) is the evidence record; dates in those records
+// are execution dates in UTC.
 console.log("── admission ──");
 console.log("status:", admission.status);
 console.log("instanceId:", admission.instanceId);
@@ -50,14 +58,19 @@ if (fb && typeof fb === "object") {
 }
 
 if (admission.status === "active" && admission.instanceId) {
-  const poll = await pollFreebuffSession(token, admission.instanceId);
-  console.log("── poll ──");
-  console.log(
-    "status:",
-    poll.status,
-    "| rateLimit rows:",
-    Object.keys(poll.rateLimitsByModel ?? {}).length,
-  );
-  await releaseFreebuffSession(token, admission.instanceId);
-  console.log("── released (DELETE) ──");
+  const instanceId = admission.instanceId;
+  try {
+    const poll = await pollFreebuffSession(token, instanceId);
+    console.log("── poll ──");
+    console.log(
+      "status:",
+      poll.status,
+      "| rateLimit rows:",
+      Object.keys(poll.rateLimitsByModel ?? {}).length,
+    );
+  } finally {
+    // Release in finally: a poll failure must never leak the seat.
+    await releaseFreebuffSession(token, instanceId);
+    console.log("── released (DELETE) ──");
+  }
 }
