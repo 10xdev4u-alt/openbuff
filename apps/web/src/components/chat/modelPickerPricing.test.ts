@@ -75,8 +75,27 @@ describe("freebuffPickerPricingForInstance", () => {
         priceChanges: [],
       }),
       ["vendor/flash"],
+      // Pinned clock — CI runs UTC, so wall-clock time makes the window
+      // state nondeterministic (CI caught this at 22:02 UTC, inside the
+      // window). Inside 22→06: off-peak price + its notice.
+      Date.parse("2026-09-18T23:00:00Z"),
     );
-    // Outside the window: peak price, notice explains the policy.
+    expect(pricing.get("vendor/flash")).toEqual({
+      price: 10,
+      notice: "Off-peak pricing · 15 Freebucks/hour at peak",
+    });
+  });
+
+  it("reads peak pricing outside the window at a pinned clock", () => {
+    const pricing = freebuffPickerPricingForInstance(
+      quote({
+        prices: { "vendor/flash": 15 },
+        offPeak: { "vendor/flash": FLASH_POLICY },
+        priceChanges: [],
+      }),
+      ["vendor/flash"],
+      Date.parse("2026-09-18T12:00:00Z"),
+    );
     expect(pricing.get("vendor/flash")).toEqual({
       price: 15,
       notice: "Peak pricing · 10 Freebucks/hour off-peak",
@@ -93,14 +112,16 @@ describe("freebuffPickerPricingForInstance", () => {
         firstTabDiscount: { amount: 10, available: true },
       }),
       ["vendor/flash"],
+      Date.parse("2026-09-18T23:00:00Z"),
     );
     const row = pricing.get("vendor/flash");
-    // Inside the 22→06 window at the fixture's implicit "now" the policy
-    // price is either 10 (off-peak) or 15 (peak); the discount moved the
-    // payable price below the raw policy price in both cases, so a strike
-    // target exists and equals the raw policy price.
-    expect(row).toBeDefined();
-    expect(row?.price).toBeLessThan(row?.listPrice ?? Number.POSITIVE_INFINITY);
+    // Inside the window: policy price 10, first-tab −10 → payable 0.
+    // The raw policy price (10) is the strike target above it.
+    expect(row).toEqual({
+      price: 0,
+      listPrice: 10,
+      notice: "Off-peak pricing · 15 Freebucks/hour at peak",
+    });
   });
 
   it("prices only the rows the picker actually shows", () => {

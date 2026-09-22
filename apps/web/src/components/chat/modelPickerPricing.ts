@@ -31,6 +31,7 @@ export interface FreebuffPickerPrice {
 export function freebuffPickerPricingForInstance(
   freebucks: FreebuffProviderFreebucks | null | undefined,
   modelSlugs: ReadonlyArray<string>,
+  now: number = Date.now(),
 ): ReadonlyMap<string, FreebuffPickerPrice> {
   if (!freebucks) {
     return new Map();
@@ -48,7 +49,7 @@ export function freebuffPickerPricingForInstance(
       ...(freebucks.firstTabDiscount ? { firstTabDiscount: freebucks.firstTabDiscount } : {}),
       ...(freebucks.offPeak ? { offPeak: freebucks.offPeak } : {}),
     },
-    Date.now(),
+    now,
   );
   const out = new Map<string, FreebuffPickerPrice>();
   for (const slug of modelSlugs) {
