@@ -48,8 +48,8 @@ catalog:
   effect: 4.0.0-beta.103
   jose: 6.2.2
   typescript: ~6.0.3
-  vite: npm:@voidzero-dev/vite-plus-core@0.2.2
-  vite-plus: 0.2.2
+  vite: npm:@voidzero-dev/vite-plus-core@0.3.3
+  vite-plus: 0.3.3
   yaml: ^2.9.0
 
 minimumReleaseAgeExclude:
