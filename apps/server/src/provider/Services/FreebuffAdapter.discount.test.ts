@@ -20,6 +20,8 @@ import { ThreadId } from "@t3tools/contracts";
 import type { FreebuffSettings } from "@t3tools/contracts";
 
 import { makeFreebuffAdapter } from "./FreebuffAdapter.ts";
+import type { ProviderAdapterShape } from "./ProviderAdapter.ts";
+import type { ProviderAdapterError } from "../Errors.ts";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -58,18 +60,18 @@ const failingRunClientFactory = async (): Promise<unknown> => ({
  * genuinely wedged adapter still fails the test instead of hanging.
  */
 async function sendTurnWhenFree(
-  adapter: Awaited<ReturnType<typeof makeFreebuffAdapter>>,
+  adapter: ProviderAdapterShape<ProviderAdapterError>,
   input: { threadId: typeof threadId; input: string },
 ): Promise<void> {
   for (let attempt = 0; attempt < 100; attempt++) {
     try {
       await Effect.runPromise(adapter.sendTurn(input));
       return;
-    } catch (error) {
+    } catch (error: unknown) {
       if (!(error instanceof Error) || !error.message.includes("active turn")) {
         throw error;
       }
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await Effect.runPromise(Effect.sleep("10 millis"));
     }
   }
   throw new Error("adapter never freed the active turn");
