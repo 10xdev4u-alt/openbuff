@@ -196,3 +196,9 @@ Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-o
 - **Worked**: research rejected 2 of 6 candidates on the twin rule BEFORE building; the #109 same-model contract auto-covered the new entries with zero extra code (designing contracts that iterate instead of enumerate pays again).
 - **Failed**: local proof ran the server suite but not packages/contracts' own — CI caught the stale "exactly the eight" pin. Rule: when changing a contract, grep EVERY package for pins on its shape (`toHaveLength(8)`, literal key lists), run those suites too.
 - **Graph nodes updated**: models row added.
+
+## 2026-09-23 — Off-peak policy port (#129 → #130)
+**What I tried** | Ported upstream's price-policy math (off-peak windows + dated changes + notices) as the fourth pricing-truth piece, with upstream's own invariant suite as the test contract.
+**What worked** | Porting the SOURCE'S TESTS, not just its code: when my ported suite failed, I checked upstream's table before doubting the port — my transcription had inverted the boundary (22:00 is off-peak ACTIVE, not peak). The port was right; the test was wrong. Also: schema + projection extended in the SAME PR (#123's lesson applied without re-erroring); `now` made a required parameter to satisfy the contracts globalDate ban, recorded as a documented deviation.
+**Lesson (reusable rule)** | When porting code WITH its tests, a failing ported test means: (1) transcription error — verify against the source's fixtures/tables FIRST, (2) then a genuinely different platform behavior, (3) and only last, a port bug. The port is the thing you wrote most carefully; your transcription is what you typed fastest.
+**Graph nodes updated** | freebuffPricePolicy; FreebuffProviderFreebucks.priceNotices/.offPeak/.priceChanges; modelPickerPricing projection; #130 merged.
