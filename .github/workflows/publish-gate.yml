@@ -1,0 +1,100 @@
+name: Publish gate
+
+# Issue #100: no tarball reaches npm without passing the end-user smoke.
+#
+# Proves, on the exact packed artifact:
+#   1. installs clean in user position under npm's default script gating
+#   2. `npm audit` reports ZERO vulnerabilities (the #96/#97 posture)
+#   3. the CLI boots and serves `/` and `/welcome` with HTTP 200
+#   4. `--version` matches the manifest version
+#
+# Trigger: workflow_dispatch. The operator runs this immediately before
+# publishing; a red gate is a hard stop (the smoke catches what CI's
+# repo-level jobs cannot — the shipped tree, not the workspace tree).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  tarball-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Build the exact artifacts the stage consumes (mirrors the Build job).
+      - name: Build server bundle + web client
+        run: |
+          pnpm build
+          pnpm --filter @princetheprogrammerbtw/openbuff run build:bundle
+
+      # Stage the publish tree deterministically (fail-closed pin assertions
+      # from #97 run here — the tree-wide security scan must pass).
+      - name: Stage publish tree
+        run: node --experimental-strip-types scripts/publish-prepare.ts
+
+      - name: Pack
+        working-directory: .publish-stage
+        run: npm pack
+
+      - name: Install in user position (clean dir)
+        run: |
+          mkdir -p /tmp/ob-smoke
+          cd /tmp/ob-smoke
+          npm install "$GITHUB_WORKSPACE/.publish-stage/"*.tgz 2>&1 | tee install.log
+          grep -q "added" install.log
+
+      - name: Assert zero vulnerabilities
+        run: |
+          cd /tmp/ob-smoke
+          npm audit 2>&1 | tee audit.log
+          grep -q "found 0 vulnerabilities" audit.log || {
+            echo "::error::audit reported vulnerabilities — publish blocked"
+            cat audit.log
+            exit 1
+          }
+
+      - name: Assert version matches manifest
+        run: |
+          EXPECTED=$(node -p "require('$GITHUB_WORKSPACE/.publish-stage/package.json').version")
+          ACTUAL=$(node -p "require('/tmp/ob-smoke/node_modules/@princetheprogrammerbtw/openbuff/package.json').version")
+          echo "manifest=$EXPECTED installed=$ACTUAL"
+          [ "$EXPECTED" = "$ACTUAL" ] || {
+            echo "::error::installed version $ACTUAL != manifest $EXPECTED"
+            exit 1
+          }
+
+      - name: Boot and probe / + /welcome
+        run: |
+          cd /tmp/ob-smoke
+          nohup npx openbuff serve > boot.log 2>&1 &
+          for i in $(seq 1 45); do
+            if curl -sf -o /dev/null http://127.0.0.1:3774/; then break; fi
+            sleep 2
+          done
+          CODE_ROOT=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3774/)
+          CODE_WELCOME=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3774/welcome)
+          echo "/ → $CODE_ROOT   /welcome → $CODE_WELCOME"
+          [ "$CODE_ROOT" = "200" ] && [ "$CODE_WELCOME" = "200" ] || {
+            echo "::error::serve probe failed"
+            tail -40 boot.log
+            exit 1
+          }
+
+      - name: Teardown
+        if: always()
+        run: |
+          pkill -f "openbuff serve" 2>/dev/null || true
+
+      - name: Failure diagnostics
+        if: failure()
+        run: |
+          echo "── install.log ──";  tail -60 /tmp/ob-smoke/install.log  2>/dev/null || true
+          echo "── audit.log ──";    tail -60 /tmp/ob-smoke/audit.log    2>/dev/null || true
+          echo "── boot.log ──";     tail -60 /tmp/ob-smoke/boot.log     2>/dev/null || true
