@@ -223,6 +223,31 @@ export const FreebuffProviderFreebucks = Schema.Struct({
       available: Schema.Boolean,
     }),
   ),
+  /** Per-model policy taglines, server-authored prose (#129). */
+  priceNotices: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  /** Recurring server-owned price windows (#129). */
+  offPeak: Schema.optional(
+    Schema.Record(
+      Schema.String,
+      Schema.Struct({
+        startHourUtc: Schema.Number,
+        endHourUtc: Schema.Number,
+        price: Schema.Number,
+        regularPrice: Schema.Number,
+      }),
+    ),
+  ),
+  /** Scheduled changes announced by the server; never reprice admitted sessions (#129). */
+  priceChanges: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        at: Schema.String,
+        modelId: Schema.String,
+        price: Schema.Number,
+        tagline: Schema.String,
+      }),
+    ),
+  ),
 });
 
 /**
