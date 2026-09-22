@@ -66,6 +66,22 @@ describe("install security contract", () => {
     );
   });
 
+  it("maps the vitest family through the patched vite-plus toolchain", () => {
+    const workspaceYaml = NodeFS.readFileSync(
+      NodePath.join(import.meta.dirname, "..", "pnpm-workspace.yaml"),
+      "utf8",
+    );
+    // The critical advisory (@vitest/browser provider command bypass) is fixed
+    // in 4.1.10+; the toolchain bump is the only mechanism that reaches it —
+    // it is pinned by vite-plus, not overridable below it.
+    assert.match(
+      workspaceYaml,
+      /vite:\s*npm:@voidzero-dev\/vite-plus-core@0\.3\.3/,
+      "catalog vite alias must ride vite-plus-core 0.3.3 (vitest 4.1.11 family)",
+    );
+    assert.match(workspaceYaml, /vite-plus:\s*0\.3\.3/, "catalog vite-plus must be 0.3.3");
+  });
+
   it("stays the scoped npm identity", () => {
     const manifest = readServerManifest();
     assert.strictEqual(manifest["name"], NPM_PACKAGE_NAME);
@@ -127,12 +143,16 @@ describe("dev-toolchain advisory pins (#99)", () => {
       "fast-uri@3.1.6",
       "path-to-regexp@6.3.0",
       "electron@41.10.7",
+      "@vitest/browser@4.1.11",
+      "@vitest/mocker@4.1.11",
     ]) {
-      // Match the package's own mapping key (`name@version:` or the peer
-      // variant `name@version(peers):`), never a dependency reference inside
-      // another package's key like `postcss@8.5.15(nanoid@3.3.18):`.
+      // Match the package's own mapping key (`'name@version':` — pnpm quotes
+      // keys — or unquoted/peer-variant forms), never a dependency reference
+      // inside another package's key like `'postcss@8.5.15(nanoid@3.3.18):'`:
+      // those carry a prefix before the pin, and dependency-value lines lack
+      // the version before the colon.
       const escaped = pin.replace(/[.@]/g, "\\$&");
-      const mappingKey = new RegExp(`^\\s*'?${escaped}(\\([^)]*\\))?:`);
+      const mappingKey = new RegExp(`^\\s*'?${escaped}(\\([^)]*\\))?'?:`);
       assert.ok(
         lockLines.some((line) => mappingKey.test(line)),
         `lockfile must map ${pin} (override not applied or install stale)`,
