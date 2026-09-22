@@ -5,10 +5,28 @@ import { FREEBUFF_FREE_MODEL_IDS } from "@t3tools/contracts";
 import { freebuffSnapshotModels } from "./FreebuffDriver.ts";
 
 describe("freebuffSnapshotModels", () => {
-  it("serves exactly the eight allowlisted free-tier rows", () => {
+  it("serves exactly the allowlisted free-tier rows", () => {
     const models = freebuffSnapshotModels();
     expect(models.map((model) => model.slug).sort()).toEqual([...FREEBUFF_FREE_MODEL_IDS].sort());
-    expect(models).toHaveLength(8);
+    expect(models).toHaveLength(12);
+  });
+
+  it("carries the CLI-selectable models upstream added (#119)", () => {
+    const slugs = freebuffSnapshotModels().map((model) => model.slug);
+    for (const slug of [
+      "stealth/ox-alpha",
+      "upstage/solar-pro4",
+      "google/gemini-3.8-flash",
+      "meta/muse-spark-1.3-contributor",
+    ]) {
+      expect(slugs).toContain(slug);
+    }
+  });
+
+  it("names every row from the upstream display-name map", () => {
+    for (const model of freebuffSnapshotModels()) {
+      expect(model.name, `unrendered slug: ${model.slug}`).not.toBe(model.slug);
+    }
   });
 
   it("pins the flash row as the tier default", () => {
