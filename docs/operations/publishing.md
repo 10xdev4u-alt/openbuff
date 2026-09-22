@@ -37,3 +37,13 @@ cd .publish-stage && npm publish --access public
 - **`bundleDependencies: ["@codebuff/sdk"]`**: npm 12 removed shrinkwraps and ignores dependency-position overrides, so the pinned clean closure ships physically in the tarball.
 - **`node-pty@1.2.0-beta.15`**: pinned exactly because that tarball ships `prebuilds/linux-*` — the CLI boots with zero install scripts under npm's gating.
 - Version bumps happen in `apps/server/package.json` **before** staging (the stage snapshot is a copy — a post-stage bump packs a stale version).
+
+## Post-publish verification (staged ≠ served)
+
+`npm publish` reporting SUCCESS means the registry **staged** the version — not that users can see it. CDN propagation has repeatedly lagged ~10–12 minutes (v0.0.36, 2026-09-23). Verify in this order:
+
+1. **Acceptance proof**: republish the identical tarball. The expected `E409 Cannot publish over previously staged version X` is _positive_ proof the registry accepted the publish.
+2. **Registry truth**: `curl -s "https://registry.npmjs.org/<pkg>"` and check `dist-tags.latest` + `time.modified` directly — `npm view` from the publishing machine reads a local packument cache and can lie about freshness.
+3. **User-position proof**: fresh dir (no cache, `--prefer-online`), `npm install <pkg>`, assert the installed `package.json` version, `npm audit` = 0, then boot the CLI and probe the HTTP endpoints. Only this step proves what a real user gets.
+
+Never publish a "hotfix" during the propagation window — the E409 you get back is the system working, not a failure.
