@@ -8,21 +8,14 @@ import {
 } from "./FreebuffSession.js";
 
 /** Minimal fetch double: records the request, replies with a canned response. */
-function makeFetch(
-  status: number,
-  body: unknown,
-  headers: Record<string, string> = {},
-) {
+function makeFetch(status: number, body: unknown, headers: Record<string, string> = {}) {
   const calls: Array<{ url: string; init: RequestInit }> = [];
   const fetchImpl = (async (url: string | URL, init: RequestInit = {}) => {
     calls.push({ url: String(url), init });
-    return new Response(
-      typeof body === "string" ? body : JSON.stringify(body),
-      {
-        status,
-        headers,
-      },
-    );
+    return new Response(typeof body === "string" ? body : JSON.stringify(body), {
+      status,
+      headers,
+    });
   }) as typeof fetch;
   return { fetchImpl, calls };
 }
@@ -77,6 +70,31 @@ describe("establishFreebuffSession — wire contract", () => {
     }
   });
 
+  // #122: the quote's discount fields must survive the projection. The wire
+  // casts into FreebuffSessionResponse, so this guards the interface against
+  // ever dropping them (a field-strict projection would silently break the
+  // strike-through + opt-in consumers downstream).
+  it("projection keeps listPrices + firstTabDiscount from the wire (#122)", async () => {
+    const { fetchImpl } = makeFetch(200, {
+      ...ACTIVE,
+      freebucks: {
+        balance: 7,
+        daily: { limit: 30, spent: 3, remaining: 27, resetAt: "2026-09-23T00:00:00Z" },
+        wallet: { balance: 4, monthlyBonus: 0 },
+        planId: null,
+        prices: { "vendor/premium": 15 },
+        listPrices: { "vendor/premium": 25 },
+        firstTabDiscount: { amount: 10, available: true },
+      },
+    });
+    const res = await establishFreebuffSession("tok", { fetch: fetchImpl });
+    expect(res.status).toBe("active");
+    if (res.status !== "active" || res.freebucks === undefined || res.freebucks === null) {
+      throw new Error("expected an active admission carrying freebucks");
+    }
+    expect(res.freebucks.listPrices).toEqual({ "vendor/premium": 25 });
+    expect(res.freebucks.firstTabDiscount).toEqual({ amount: 10, available: true });
+  });
 });
 
 describe("establishFreebuffSession — gate statuses return, terminal errors throw", () => {
@@ -110,11 +128,7 @@ describe("establishFreebuffSession — gate statuses return, terminal errors thr
   });
 
   it("throws a typed error with machine-readable code + retry-after on hard failures", async () => {
-    const { fetchImpl } = makeFetch(
-      500,
-      { error: "internal" },
-      { "retry-after": "30" },
-    );
+    const { fetchImpl } = makeFetch(500, { error: "internal" }, { "retry-after": "30" });
     const err = await establishFreebuffSession("tok", { fetch: fetchImpl }).then(
       () => null,
       (e: unknown) => e,
@@ -135,9 +149,7 @@ describe("establishFreebuffSession — gate statuses return, terminal errors thr
         (e: unknown) => e,
       );
       expect(err).toBeInstanceOf(FreebuffSessionRequestError);
-      expect((err as FreebuffSessionRequestError).errorCode).toBe(
-        "session_admission_unsupported",
-      );
+      expect((err as FreebuffSessionRequestError).errorCode).toBe("session_admission_unsupported");
       expect((err as FreebuffSessionRequestError).message).toBe(
         FREEBUFF_SESSION_UNSUPPORTED_MESSAGE,
       );
@@ -148,11 +160,7 @@ describe("establishFreebuffSession — gate statuses return, terminal errors thr
 describe("retry-after parsing", () => {
   it("parses seconds values into ms, rejects junk", async () => {
     for (const seconds of [0, 1, 30, 3_600, 86_400]) {
-      const { fetchImpl } = makeFetch(
-        503,
-        {},
-        { "retry-after": String(seconds) },
-      );
+      const { fetchImpl } = makeFetch(503, {}, { "retry-after": String(seconds) });
       const err = (await establishFreebuffSession("tok", {
         fetch: fetchImpl,
       }).then(
