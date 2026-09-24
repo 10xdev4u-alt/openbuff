@@ -75,7 +75,7 @@ import { AsyncResult } from "effect/unstable/reactivity";
 import { isElectron } from "../env";
 import { readLocalApi } from "../localApi";
 import { resolveModelSwitchConfirmation } from "./chat/modelSwitchConfirmation.logic";
-import { resolveTrainingDataConsent } from "./chat/modelTrainingConsent.logic";
+import { resolveDataUseConsent } from "./chat/modelDataUseConsent.logic";
 import { useDiffPanelStore } from "../diffPanelStore";
 import {
   collapseExpandedComposerCursor,
@@ -5971,12 +5971,14 @@ function ChatViewContent(props: ChatViewProps) {
         scheduleComposerFocus();
         return;
       }
-      // Training-data consent (PR #139 review): rows whose supplier trains
-      // on prompts/completions (the Muse Spark Contributor discount) gate
-      // first use behind an explicit consent. Composed BEFORE the seat
-      // handoff below: a consent cancel must leave everything untouched,
-      // and the handoff's confirm releases the seat.
-      const consent = resolveTrainingDataConsent({
+      // Data-use consent (PR #139 review; generalized in the disclosures
+      // arc): rows whose supplier trains on prompts/completions (the Muse
+      // Spark discount) or retains them under its own terms (Space Bunny's
+      // stealth host) gate switching onto them behind an explicit consent.
+      // Composed BEFORE the seat handoff below: a consent cancel must
+      // leave everything untouched, and the handoff's confirm releases the
+      // seat.
+      const consent = resolveDataUseConsent({
         nextModel: resolvedModel,
         models: entry?.models,
       });

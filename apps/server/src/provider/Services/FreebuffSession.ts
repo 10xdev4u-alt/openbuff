@@ -116,6 +116,12 @@ export interface FreebuffSessionResponse {
   readonly requiresSubscription?: boolean;
   /** `model_unavailable`: model withdrawn from free mode — permanent. */
   readonly withdrawn?: boolean;
+  /** `model_unavailable` on a limited-offer row: `used` means a consumed
+   *  personal trial that neither waiting nor upgrading replenishes; `closed`
+   *  and `exhausted` are the pool-side closes. Our picker never offers
+   *  limited-offer rows, so this normally cannot fire — carried for wire
+   *  truth (verified against live upstream 2026-09-24). */
+  readonly limitedOfferReason?: "used" | "closed" | "exhausted";
 }
 
 /** Minimal projection of upstream `FreebuffFreeWindowsInfo`. */
@@ -420,12 +426,24 @@ export type SessionPollClass =
  * rule: `availableHours` is the prose floor, quoted verbatim (the server
  * already names its zone); `availableAt` is an ISO instant precisely because
  * only the client knows the reader's timezone — so it renders locally, and
- * when it is absent (older servers) no time is invented.
+ * when it is absent (older servers) no time is invented. A `used` limited
+ * offer is the one refusal where "come back later" is FALSE advice — a
+ * consumed personal trial cannot be replenished by waiting or upgrading —
+ * so it leads with that and never offers a return time.
  */
 export function formatModelUnavailableProse(
-  body: Pick<FreebuffSessionResponse, "availableHours" | "availableAt">,
+  body: Pick<
+    FreebuffSessionResponse,
+    "availableHours" | "availableAt" | "limitedOfferReason"
+  >,
   nowMs: number = Date.now(),
 ): string {
+  if (body.limitedOfferReason === "used") {
+    return (
+      `This model's free offer has already been used on this account — ` +
+      `waiting or upgrading will not bring it back.`
+    );
+  }
   const floor = body.availableHours ?? "not available right now";
   const opening = `This model is closed for free sessions right now — ${floor}.`;
   if (body.availableAt === undefined) {
