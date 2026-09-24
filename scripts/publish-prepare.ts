@@ -190,7 +190,10 @@ const prepareStage = Effect.gen(function* () {
     "--fetch-retry-mintimeout=15000",
     "--fetch-retry-maxtimeout=60000",
   ];
-  if (process.env.CI === "true") npmArgs.push("--loglevel=info");
+  // silly (not info) under CI: run 4's hang left only fetch lines, and the
+  // stall was in reify — silly logs each reify op, so the next hang's last
+  // line names the exact operation it died on.
+  if (process.env.CI === "true") npmArgs.push("--loglevel=silly");
   const install = yield* ChildProcess.make("npm", npmArgs, {
       cwd: stageDir,
       stdout: "inherit",
