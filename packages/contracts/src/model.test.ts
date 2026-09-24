@@ -9,6 +9,8 @@ import {
   FREEBUFF_FREE_PICKER_MODEL_IDS,
   resolveFreebuffAgentForModel,
   resolveFreebuffServedModel,
+  FREEBUFF_PROMPT_RETENTION_MODEL_SLUGS,
+  FREEBUFF_TRAINING_DATA_MODEL_SLUGS,
 } from "./model.ts";
 import { ProviderDriverKind } from "./providerInstance.ts";
 
@@ -226,5 +228,18 @@ describe("resolveFreebuffServedModel", () => {
         expect(coerced).toBe(resolveFreebuffAgentForModel("z-ai/glm-5.3-flash"));
       }
     }
+  });
+
+  it("pins the disclosure sets (training + prompt retention)", () => {
+    // The picker renders a badge per slug in these sets; they must stay in
+    // lockstep with the servable roster (upstream evidence 2026-09-24:
+    // Muse Spark 1.2 = dataUse 'training', Space Bunny Alpha = stealth
+    // host retaining prompts, dataUse 'service').
+    expect([...FREEBUFF_TRAINING_DATA_MODEL_SLUGS].sort()).toEqual([
+      "meta/muse-spark-1.2-contributor",
+    ]);
+    expect([...FREEBUFF_PROMPT_RETENTION_MODEL_SLUGS].sort()).toEqual([
+      "stealth/space-bunny-alpha",
+    ]);
   });
 });
