@@ -16,7 +16,7 @@
  */
 import {
   DEFAULT_FREEBUFF_FREE_MODEL,
-  FREEBUFF_FREE_MODEL_IDS,
+  FREEBUFF_FREE_PICKER_MODEL_IDS,
   FreebuffSettings,
   ProviderDriverKind,
   type FreebuffProviderUsage,
@@ -43,33 +43,42 @@ import { mergeProviderUsage } from "../providerUsageMerge.ts";
 import { makeManualOnlyProviderMaintenanceCapabilities } from "../providerMaintenance.ts";
 
 /**
- * Upstream display names for the free-tier allowlist (upstream
+ * Upstream display names for the free-tier picker (upstream
  * `common/src/constants/freebuff-models.ts` model entries). The slug set is
- * owned by the contracts pairing map; this only supplies what the picker
- * renders. Reconciled to the live 6-row roster in #137 — the withdrawn rows
- * (v4-pro, minimax-m3, ox-alpha, glm-5.2, muse-spark-1.3, gemini-3.8-flash)
- * and god-only rows (kimi-k3-eco, luna-es) have no entry.
+ * owned by the contracts picker list (`FREEBUFF_FREE_PICKER_MODEL_IDS`); this
+ * only supplies what the picker renders. Reconciled to the live roster
+ * verified 2026-09-24 — gpt-6-luna, solar-mini4 and stealth/space-bunny-alpha
+ * joined on 09-22/09-23; the picker-retired gpt-5.6-luna and solar-pro4 rows
+ * were dropped (drain picks still resolve through the contracts pairing map,
+ * which keeps their agent rows — admission and the picker diverge by design).
+ * Withdrawn rows (v4-pro, minimax-m3, ox-alpha, glm-5.2, muse-spark-1.3) and
+ * god-only rows (kimi-k3-eco, luna-es) have no entry.
  *
  * The MiMo wire id is stable but the serving build moved: MiMo 2.6 Flash
  * since 2026-09-21 under the unchanged id (same Xiaomi rate card to the
- * cent), so the label carries the version the wire actually serves.
+ * cent), so the label carries the version the wire actually serves —
+ * re-verified against the live catalog 2026-09-24.
  */
 const FREEBUFF_MODEL_DISPLAY_NAME_BY_SLUG: Readonly<Record<string, string>> = {
   "z-ai/glm-5.3-flash": "GLM 5.3 Flash",
   "deepseek/deepseek-v4-flash": "DeepSeek V4.1 Flash",
-  "openai/gpt-5.6-luna": "GPT-5.6 Luna",
+  "openai/gpt-6-luna": "GPT-6 Luna",
   "mimo/mimo-v2.5": "MiMo 2.6 Flash",
-  "upstage/solar-pro4": "Solar Pro 4",
+  "upstage/solar-mini4": "Solar Mini 4",
+  "stealth/space-bunny-alpha": "Space Bunny Alpha",
   "meta/muse-spark-1.2-contributor": "Muse Spark 1.2",
 };
 
 /**
- * The free-tier picker rows: exactly the allowlisted models, flash pinned as
- * the tier default. Capabilities stay null (the base3 agents take no runtime
+ * The free-tier picker rows: the picker-subset from contracts
+ * (`FREEBUFF_FREE_PICKER_MODEL_IDS`), flash pinned as the tier default.
+ * Deliberately NOT the full pairing map — picker-retired rows (gpt-5.6-luna,
+ * solar-pro4) leave the picker while staying resolvable at admission for
+ * draining sessions. Capabilities stay null (the base3 agents take no runtime
  * options); the adapter derives the agent per selected slug.
  */
 export function freebuffSnapshotModels(): ReadonlyArray<ServerProviderModel> {
-  return FREEBUFF_FREE_MODEL_IDS.map((slug) => ({
+  return FREEBUFF_FREE_PICKER_MODEL_IDS.map((slug) => ({
     slug,
     name: FREEBUFF_MODEL_DISPLAY_NAME_BY_SLUG[slug] ?? slug,
     isCustom: false,

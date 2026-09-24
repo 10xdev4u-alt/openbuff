@@ -1,19 +1,21 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { DEFAULT_FREEBUFF_FREE_MODEL, FREEBUFF_FREE_MODEL_IDS } from "@t3tools/contracts";
+import { DEFAULT_FREEBUFF_FREE_MODEL, FREEBUFF_FREE_PICKER_MODEL_IDS } from "@t3tools/contracts";
 
 import { freebuffSnapshotModels } from "./FreebuffDriver.ts";
 
 describe("freebuffSnapshotModels", () => {
-  it("serves exactly the allowlisted free-tier rows", () => {
+  it("serves exactly the free-tier picker rows", () => {
     const models = freebuffSnapshotModels();
-    expect(models.map((model) => model.slug).sort()).toEqual([...FREEBUFF_FREE_MODEL_IDS].sort());
-    expect(models).toHaveLength(6);
+    expect(models.map((model) => model.slug).sort()).toEqual(
+      [...FREEBUFF_FREE_PICKER_MODEL_IDS].sort(),
+    );
+    expect(models).toHaveLength(7);
   });
 
-  it("carries only upstream-live free rows (#137)", () => {
-    // Withdrawn 2026-08-20 → 2026-09-07 (upstream FREEBUFF_PAUSED_FREE_MODEL_IDS)
-    // or paywalled/god-only — none may appear as a selectable row.
+  it("carries only upstream-live free rows (re-verified 2026-09-24)", () => {
+    // Withdrawn 2026-08-20 → 2026-09-07 (upstream FREEBUFF_PAUSED_FREE_MODEL_IDS),
+    // paywalled, god-only, or picker-retired — none may appear as a fresh pick.
     const slugs = freebuffSnapshotModels().map((model) => model.slug);
     for (const dead of [
       "stealth/ox-alpha",
@@ -24,6 +26,11 @@ describe("freebuffSnapshotModels", () => {
       "z-ai/glm-5.2",
       "crof/kimi-k3-eco",
       "openai/gpt-5.6-luna-es",
+      // Picker-retired 09-22/09-23: servable for drain, not freshly selectable.
+      "openai/gpt-5.6-luna",
+      "upstage/solar-pro4",
+      // Limited-offer row: server-pushed only, never a client picker row.
+      "anthropic/claude-fable-5.1",
     ]) {
       expect(slugs).not.toContain(dead);
     }
@@ -52,9 +59,10 @@ describe("freebuffSnapshotModels", () => {
     );
     expect(namesBySlug.get("z-ai/glm-5.3-flash")).toBe("GLM 5.3 Flash");
     expect(namesBySlug.get("deepseek/deepseek-v4-flash")).toBe("DeepSeek V4.1 Flash");
-    expect(namesBySlug.get("openai/gpt-5.6-luna")).toBe("GPT-5.6 Luna");
+    expect(namesBySlug.get("openai/gpt-6-luna")).toBe("GPT-6 Luna");
     expect(namesBySlug.get("mimo/mimo-v2.5")).toBe("MiMo 2.6 Flash");
-    expect(namesBySlug.get("upstage/solar-pro4")).toBe("Solar Pro 4");
+    expect(namesBySlug.get("upstage/solar-mini4")).toBe("Solar Mini 4");
+    expect(namesBySlug.get("stealth/space-bunny-alpha")).toBe("Space Bunny Alpha");
     expect(namesBySlug.get("meta/muse-spark-1.2-contributor")).toBe("Muse Spark 1.2");
   });
 
