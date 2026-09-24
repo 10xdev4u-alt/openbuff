@@ -75,6 +75,7 @@ import { AsyncResult } from "effect/unstable/reactivity";
 import { isElectron } from "../env";
 import { readLocalApi } from "../localApi";
 import { resolveModelSwitchConfirmation } from "./chat/modelSwitchConfirmation.logic";
+import { resolveTrainingDataConsent } from "./chat/modelTrainingConsent.logic";
 import { useDiffPanelStore } from "../diffPanelStore";
 import {
   collapseExpandedComposerCursor,
@@ -5969,6 +5970,29 @@ function ChatViewContent(props: ChatViewProps) {
       if (confirmation.action === "cancel") {
         scheduleComposerFocus();
         return;
+      }
+      // Training-data consent (PR #139 review): rows whose supplier trains
+      // on prompts/completions (the Muse Spark Contributor discount) gate
+      // first use behind an explicit consent. Composed BEFORE the seat
+      // handoff below: a consent cancel must leave everything untouched,
+      // and the handoff's confirm releases the seat.
+      const consent = resolveTrainingDataConsent({
+        nextModel: resolvedModel,
+        models: entry?.models,
+      });
+      if (consent.action === "cancel") {
+        scheduleComposerFocus();
+        return;
+      }
+      if (consent.action === "confirm") {
+        const localApi = readLocalApi();
+        const consented = (await localApi?.dialogs.confirm(consent.message, {
+          variant: "default",
+        })) ?? false;
+        if (!consented) {
+          scheduleComposerFocus();
+          return;
+        }
       }
       if (confirmation.action === "confirm") {
         const localApi = readLocalApi();

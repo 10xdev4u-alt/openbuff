@@ -62,8 +62,9 @@ describe("freebuff subagent suite (#108)", () => {
       expect(reviewer, `reviewer missing for model ${model}`).toBeDefined();
       expect(reviewer?.model).toBe(root.model);
     }
+    // GLM 5.3 Flash is the tier default (#137): upstream moved it 2026-08-30.
     expect(FREEBUFF_FREE_AGENT_BY_MODEL[DEFAULT_FREEBUFF_FREE_MODEL]).toBe(
-      "base3-free-deepseek-flash",
+      "base3-free-glm-5-3-flash",
     );
   });
 

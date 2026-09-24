@@ -28,12 +28,12 @@ describe("gate body passthrough", () => {
   it("model_locked carries current + requested models through admission", async () => {
     const res = await admit({
       status: "model_locked",
-      currentModel: "deepseek/deepseek-v4-flash",
-      requestedModel: "z-ai/glm-5.2",
+      currentModel: "z-ai/glm-5.3-flash",
+      requestedModel: "deepseek/deepseek-v4-flash",
     });
     expect(res.status).toBe("model_locked");
-    expect(res.currentModel).toBe("deepseek/deepseek-v4-flash");
-    expect(res.requestedModel).toBe("z-ai/glm-5.2");
+    expect(res.currentModel).toBe("z-ai/glm-5.3-flash");
+    expect(res.requestedModel).toBe("deepseek/deepseek-v4-flash");
   });
 
   it("model_unavailable carries prose floor and the computable instant", async () => {

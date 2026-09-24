@@ -23,7 +23,7 @@ function makeFetch(status: number, body: unknown, headers: Record<string, string
 const ACTIVE = {
   status: "active",
   instanceId: "inst_123",
-  model: "deepseek/deepseek-v4-flash",
+  model: "z-ai/glm-5.3-flash",
   expiresAt: "2026-09-16T12:00:00Z",
   remainingMs: 600_000,
 };
@@ -43,7 +43,7 @@ describe("establishFreebuffSession — wire contract", () => {
     expect(headers["Authorization"]).toBe("Bearer tok");
     expect(headers["x-fb-timezone"]).toBeTruthy();
     expect(headers["x-freebuff-first-tab-discount"]).toBe("0");
-    expect(headers["x-freebuff-model"]).toBe("deepseek/deepseek-v4-flash");
+    expect(headers["x-freebuff-model"]).toBe("z-ai/glm-5.3-flash");
     expect(headers["x-freebuff-wallet-spend-limit"]).toBe("0");
     // The instance header belongs to GET/DELETE only; POST must not send it.
     expect(headers["x-freebuff-instance-id"]).toBeUndefined();
