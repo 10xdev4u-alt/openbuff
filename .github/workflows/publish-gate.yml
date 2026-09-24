@@ -15,6 +15,12 @@ name: Publish gate
 on:
   workflow_dispatch:
 
+# #146: two dispatches must never overlap (run 1's mid-flight cancel was
+# indistinguishable from a collision at first look). Queued, never killed.
+concurrency:
+  group: publish-gate
+  cancel-in-progress: false
+
 jobs:
   tarball-smoke:
     runs-on: ubuntu-latest
@@ -30,20 +36,27 @@ jobs:
 
       # Build the exact artifacts the stage consumes (mirrors the Build job).
       - name: Build server bundle + web client
+        timeout-minutes: 10
         run: |
           pnpm build
           pnpm --filter @princetheprogrammerbtw/openbuff run build:bundle
 
       # Stage the publish tree deterministically (fail-closed pin assertions
       # from #97 run here — the tree-wide security scan must pass).
+      # #146: this step is where both stuck runs sat. A per-step timeout turns
+      # a runner-side hang into a RED failure with diagnostics instead of an
+      # invisible sit; locally it takes ~35 s, 12 min is 20x headroom.
       - name: Stage publish tree
+        timeout-minutes: 12
         run: node --experimental-strip-types scripts/publish-prepare.ts
 
       - name: Pack
+        timeout-minutes: 5
         working-directory: .publish-stage
         run: npm pack
 
       - name: Install in user position (clean dir)
+        timeout-minutes: 10
         run: |
           mkdir -p /tmp/ob-smoke
           cd /tmp/ob-smoke
@@ -51,6 +64,7 @@ jobs:
           grep -q "added" install.log
 
       - name: Assert zero vulnerabilities
+        timeout-minutes: 5
         run: |
           cd /tmp/ob-smoke
           npm audit 2>&1 | tee audit.log
@@ -93,7 +107,10 @@ jobs:
           pkill -f "openbuff serve" 2>/dev/null || true
 
       - name: Failure diagnostics
-        if: failure()
+        # #146: a job killed by its own (or a step's) timeout is CANCELLED, not
+        # failed — `if: failure()` alone skips this step exactly when logs
+        # matter most. Fire on both.
+        if: failure() || cancelled()
         run: |
           echo "── install.log ──";  tail -60 /tmp/ob-smoke/install.log  2>/dev/null || true
           echo "── audit.log ──";    tail -60 /tmp/ob-smoke/audit.log    2>/dev/null || true
