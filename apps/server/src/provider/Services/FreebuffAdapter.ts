@@ -69,6 +69,7 @@ import {
   DEFAULT_FREEBUFF_FREE_MODEL,
   FREEBUFF_FREE_AGENT_BY_MODEL,
   resolveFreebuffAgentForModel,
+  resolveFreebuffServedModel,
 } from "@t3tools/contracts";
 import { classifyFreebuffGate, freebuffGateDisposition, gateUserMessage } from "./FreebuffGate.ts";
 import { mergeProviderUsage, usageFromSessionResponse } from "../providerUsageMerge.ts";
@@ -549,11 +550,19 @@ export const makeFreebuffAdapter = (
         // once per thread and reuse the server-assigned instance id for every
         // subsequent turn; re-admit if a previous admission was never made.
         if (state.freebuffInstanceId === undefined) {
+          // Serve ONLY what the pairing map can serve: the admission header
+          // and the agent suite below are decided from the same resolver, so
+          // a pick the map cannot serve (upstream shipped it before we
+          // reconciled; a released binary holds a withdrawn id) omits the
+          // header and lands on the tier default everywhere — the suite's
+          // coercion and upstream's session gate then agree instead of
+          // dying on `session_model_mismatch` every turn.
+          const servedModel = resolveFreebuffServedModel(modelSelection);
           const admission = yield* Effect.tryPromise({
             try: () =>
               establishFreebuffSession(config.apiKey, {
                 signal: abort.signal,
-                ...(modelSelection !== undefined ? { model: modelSelection } : {}),
+                ...(servedModel !== undefined ? { model: servedModel } : {}),
                 firstTabDiscount: firstTabDiscountOptIn,
                 ...(fetchImpl !== undefined ? { fetch: fetchImpl } : {}),
               }),

@@ -8,6 +8,7 @@ import {
   FREEBUFF_FREE_MODEL_IDS,
   FREEBUFF_FREE_PICKER_MODEL_IDS,
   resolveFreebuffAgentForModel,
+  resolveFreebuffServedModel,
 } from "./model.ts";
 import { ProviderDriverKind } from "./providerInstance.ts";
 
@@ -176,5 +177,54 @@ describe("resolveFreebuffAgentForModel", () => {
   it("still resolves drain picks (picker-retired, admissible) without coercion", () => {
     expect(resolveFreebuffAgentForModel("openai/gpt-5.6-luna")).toBe("base3-free-luna");
     expect(resolveFreebuffAgentForModel("upstage/solar-pro4")).toBe("base3-free-solar-pro4");
+  });
+});
+
+describe("resolveFreebuffServedModel", () => {
+  // The admission/suite coherence contract: both model-consuming legs of a
+  // free session resolve their model through THIS function, so a pick the
+  // pairing map cannot serve falls through to the tier default on BOTH legs
+  // and upstream's session gate never sees `session_model_mismatch`.
+  it("serves picker rows and drain rows as-is", () => {
+    expect(resolveFreebuffServedModel("z-ai/glm-5.3-flash")).toBe("z-ai/glm-5.3-flash");
+    expect(resolveFreebuffServedModel("openai/gpt-6-luna")).toBe("openai/gpt-6-luna");
+    expect(resolveFreebuffServedModel("openai/gpt-5.6-luna")).toBe("openai/gpt-5.6-luna");
+    expect(resolveFreebuffServedModel("upstage/solar-pro4")).toBe("upstage/solar-pro4");
+  });
+
+  it("refuses to serve withdrawn or unknown ids", () => {
+    for (const dead of [
+      "stealth/ox-alpha",
+      "minimax/minimax-m3",
+      "deepseek/deepseek-v4-pro",
+      "meta/muse-spark-1.3-contributor",
+      "acme/nonexistent",
+    ]) {
+      expect(resolveFreebuffServedModel(dead), dead).toBeUndefined();
+    }
+  });
+
+  it("an absent selection stays absent (caller pins the default)", () => {
+    expect(resolveFreebuffServedModel(undefined)).toBeUndefined();
+  });
+
+  it("answers `undefined` for exactly the ids resolveFreebuffAgentForModel coerces", () => {
+    // The two resolvers must agree on the servable set or the legs diverge.
+    const probe = [
+      "z-ai/glm-5.3-flash",
+      "openai/gpt-6-luna",
+      "openai/gpt-5.6-luna",
+      "stealth/ox-alpha",
+      "acme/nonexistent",
+    ];
+    for (const model of probe) {
+      const coerced = resolveFreebuffAgentForModel(model);
+      const served = resolveFreebuffServedModel(model);
+      if (served !== undefined) {
+        expect(resolveFreebuffAgentForModel(served)).toBe(coerced);
+      } else {
+        expect(coerced).toBe(resolveFreebuffAgentForModel("z-ai/glm-5.3-flash"));
+      }
+    }
   });
 });

@@ -298,6 +298,26 @@ export function resolveFreebuffAgentForModel(model: string | undefined): string 
   return FREEBUFF_FREE_AGENT_BY_MODEL[DEFAULT_FREEBUFF_FREE_MODEL] as string;
 }
 
+/**
+ * The model to SERVE for a user's pick, or `undefined` to let the server
+ * apply the tier default. This is the single source of truth shared by the
+ * two model-consuming legs of a free session — the ADMISSION header
+ * (`x-freebuff-model`) and the agent suite's model field — so they can
+ * never disagree: a pick servable through the pairing map (picker rows AND
+ * drain rows) is served as-is; anything else resolves to `undefined` here
+ * and the default everywhere, upstream's #1801 coercion doctrine applied
+ * at the wire. Sending a raw pick the map cannot serve would admit a
+ * session on model X while the suite runs the default pair — and upstream's
+ * session gate rejects the mismatch (`session_model_mismatch`) on every
+ * turn.
+ */
+export function resolveFreebuffServedModel(
+  model: string | undefined,
+): string | undefined {
+  if (model === undefined) return undefined;
+  return FREEBUFF_FREE_AGENT_BY_MODEL[model] !== undefined ? model : undefined;
+}
+
 /** Per-provider text generation model defaults. */
 export const DEFAULT_TEXT_GENERATION_MODEL_BY_PROVIDER: Partial<
   Record<ProviderDriverKind, string>
