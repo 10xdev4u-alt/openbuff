@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off globalConsole:off - probe runs as a plain node script, not an Effect program.
+// @effect-diagnostics nodeBuiltinImport:off globalConsole:off globalFetch:off - probe runs as a plain node script, not an Effect program.
 /**
  * Live wire probe (follow-up to #107/#109, self-contained since #139):
  * establish a REAL Freebuff free session with the local CLI credentials and
