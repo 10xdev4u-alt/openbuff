@@ -13,8 +13,8 @@
  *      ("You are Buffy, the coding agent behind Codebuff."). See the
  *      agent definition in FreebuffAdapter.ts.
  *   2. The agent id + model combo is on the free-mode allowlist. The
- *      adapter supplies a local `base3-free-deepseek-flash` template pinned
- *      to `deepseek/deepseek-v4-flash`.
+ *      adapter supplies a local `base3-free-glm-5-3-flash` template pinned
+ *      to `z-ai/glm-5.3-flash`.
  *   3. An ACTIVE free session, tied to the request via
  *      `codebuff_metadata.freebuff_instance_id`. Without it the backend
  *      answers `waiting_room_required`.
@@ -45,11 +45,12 @@ export const FREEBUFF_API_BASE = "https://www.codebuff.com";
 
 /**
  * The model this account is entitled to on the geo-limited free tier. Must
- * match the model pinned in the adapter's `base3-free-deepseek-flash` agent
+ * match the model pinned in the adapter's `base3-free-glm-5-3-flash` agent
  * definition — the backend rejects any other agent/model pairing in free
- * mode.
+ * mode. GLM 5.3 Flash is upstream's default (2026-08-30, unpinned 09-05):
+ * the unmetered row, open at every hour, cheapest served.
  */
-export const FREEBUFF_FREE_MODEL = "deepseek/deepseek-v4-flash";
+export const FREEBUFF_FREE_MODEL = "z-ai/glm-5.3-flash";
 
 /** Per-turn scope carrying the active session's server-assigned instance id. */
 interface FreebuffTurnContext {

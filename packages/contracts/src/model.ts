@@ -137,11 +137,17 @@ const FREEBUFF_DRIVER_KIND = ProviderDriverKind.make("freebuff");
 /**
  * Freebuff's free tier is pinned server-side to one model
  * (`FREEBUFF_FREE_MODEL` in the server adapter — currently
- * deepseek/deepseek-v4-flash). Contracts cannot import from apps, so this
- * default mirrors that pin and must move with it. The previous
- * `gpt-5.6-sol` value was a paid model the free tier cannot run.
+ * z-ai/glm-5.3-flash). Contracts cannot import from apps, so this
+ * default mirrors that pin and must move with it.
+ *
+ * Moved from deepseek/deepseek-v4-flash to match upstream's 2026-08-30
+ * default change (unpinned again 2026-09-05): GLM 5.3 Flash is the unmetered
+ * (`premium: false`) row — a new user's first send cannot exhaust a pool —
+ * open at every hour, and measured production spend puts V4 Flash at 8.9x
+ * its cost per message. The old default's DeepSeek lane also carries
+ * peak/off-peak pricing windows, which a default should never impose.
  */
-export const DEFAULT_FREEBUFF_FREE_MODEL = "deepseek/deepseek-v4-flash";
+export const DEFAULT_FREEBUFF_FREE_MODEL = "z-ai/glm-5.3-flash";
 
 export const DEFAULT_MODEL = "gpt-5.6-sol";
 
@@ -170,31 +176,43 @@ export const DEFAULT_MODEL_BY_PROVIDER: Partial<Record<ProviderDriverKind, strin
  * The free-mode agent pairing table — one base3 root agent id per selectable
  * free-tier model, mirrored verbatim from upstream
  * (`common/src/constants/free-agents.ts` `FREEBUFF_WEB_BASE3_AGENT_ID_BY_MODEL`,
- * 8 core picker rows as of 2026-09-16). The backend's free-mode allowlist
+ * the live picker roster as of 2026-09-22). The backend's free-mode allowlist
  * rejects any model whose paired agent id is not sent with the request
  * (`free_mode_invalid_agent_model`), so a model may only be requested through
- * its row here. Models outside the map resolve to the flash fallback root,
- * which itself rejects unknown models server-side — fail-closed.
+ * its row here. Models outside the map resolve to the default's root
+ * (`base3-free-glm-5-3-flash`), which itself rejects unknown models
+ * server-side — fail-closed.
+ *
+ * Roster reconciliation (#137), upstream-evidenced:
+ *  - WITHDRAWN from free mode, 2026-08-20 → 2026-09-07, per
+ *    `FREEBUFF_PAUSED_FREE_MODEL_IDS`: deepseek-v4-pro (cost), minimax-m3
+ *    (cost), stealth/ox-alpha (host ended the free promotion), z-ai/glm-5.2
+ *    (reward pool moved to GLM 5.3 Flash), muse-spark-1.3 (404 model_not_found
+ *    on every key). Their rows are dropped here; picks of them coerce to the
+ *    default's root below, the upstream #1801 doctrine — a refused id is the
+ *    retry loop that cost the limited tier 2.5x its admissions.
+ *  - google/gemini-3.8-flash returned 2026-09-04 BEHIND the subscription
+ *    paywall (web-only Pro row) — not free-tier selectable.
+ *  - crof/kimi-k3-eco and openai/gpt-5.6-luna-es are upstream
+ *    `FREEBUFF_WEB_GOD_ONLY_MODELS` (`premium: true`) — never normal-picker
+ *    rows, so the 4 priced models missing from the picker were not picker
+ *    material at all.
+ *  - meta/muse-spark-1.2-contributor REPLACED 1.3 on 2026-09-07 on every
+ *    surface (answered 5/5 in the probe that killed 1.3) and carries the
+ *    AI-training disclosure pair (`dataUse: 'training'`).
+ *  - mimo/mimo-v2.5 is live (upstream `FREEBUFF_ENABLE_MIMO_MODELS_IN_UI` is
+ *    true).
  *
  * Paired with `FREEBUFF_FREE_MODEL_IDS` (picker enumeration) and
  * `resolveFreebuffAgentForModel` (request derivation).
  */
 export const FREEBUFF_FREE_AGENT_BY_MODEL: Readonly<Record<string, string>> = {
-  "deepseek/deepseek-v4-pro": "base3-free-deepseek",
-  "deepseek/deepseek-v4-flash": "base3-free-deepseek-flash",
-  "mimo/mimo-v2.5": "base3-free-mimo",
-  "minimax/minimax-m3": "base3-free-minimax-m3",
-  "openai/gpt-5.6-luna": "base3-free-luna",
-  "z-ai/glm-5.2": "base3-free-glm",
   "z-ai/glm-5.3-flash": "base3-free-glm-5-3-flash",
-  "crof/kimi-k3-eco": "base3-free-kimi-k3-eco",
-  // CLI-selectable upstream additions (2026-09 week, verified against the
-  // upstream CLI base3 map during the #116 port review) — each with a real
-  // base3-free-* agent twin; wire ids from upstream model constants.
-  "stealth/ox-alpha": "base3-free-ox-alpha",
+  "deepseek/deepseek-v4-flash": "base3-free-deepseek-flash",
+  "openai/gpt-5.6-luna": "base3-free-luna",
+  "mimo/mimo-v2.5": "base3-free-mimo",
   "upstage/solar-pro4": "base3-free-solar-pro4",
-  "google/gemini-3.8-flash": "base3-free-gemini-3-8-flash",
-  "meta/muse-spark-1.3-contributor": "base3-free-muse-spark-1-3",
+  "meta/muse-spark-1.2-contributor": "base3-free-muse-spark",
 };
 
 /** Every selectable free-tier model id (the picker's row set). */

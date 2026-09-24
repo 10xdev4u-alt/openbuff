@@ -45,22 +45,18 @@ import { makeManualOnlyProviderMaintenanceCapabilities } from "../providerMainte
 /**
  * Upstream display names for the free-tier allowlist (upstream
  * `common/src/constants/freebuff-models.ts` model entries). The slug set is
- * owned by the contracts pairing map; this only supplies what the picker renders.
+ * owned by the contracts pairing map; this only supplies what the picker
+ * renders. Reconciled to the live 6-row roster in #137 — the withdrawn rows
+ * (v4-pro, minimax-m3, ox-alpha, glm-5.2, muse-spark-1.3, gemini-3.8-flash)
+ * and god-only rows (kimi-k3-eco, luna-es) have no entry.
  */
 const FREEBUFF_MODEL_DISPLAY_NAME_BY_SLUG: Readonly<Record<string, string>> = {
-  "deepseek/deepseek-v4-pro": "DeepSeek V4 Pro",
-  "deepseek/deepseek-v4-flash": "DeepSeek V4.1 Flash",
-  "mimo/mimo-v2.5": "MiMo 2.5",
-  "minimax/minimax-m3": "MiniMax M3",
-  "openai/gpt-5.6-luna": "GPT-5.6 Luna",
-  "z-ai/glm-5.2": "GLM 5.2",
   "z-ai/glm-5.3-flash": "GLM 5.3 Flash",
-  "crof/kimi-k3-eco": "Kimi K3",
-  // CLI-selectable upstream additions (#119).
-  "stealth/ox-alpha": "Ox Alpha",
+  "deepseek/deepseek-v4-flash": "DeepSeek V4.1 Flash",
+  "openai/gpt-5.6-luna": "GPT-5.6 Luna",
+  "mimo/mimo-v2.5": "MiMo 2.5",
   "upstage/solar-pro4": "Solar Pro 4",
-  "google/gemini-3.8-flash": "Gemini 3.8 Flash",
-  "meta/muse-spark-1.3-contributor": "Muse Spark 1.3",
+  "meta/muse-spark-1.2-contributor": "Muse Spark 1.2",
 };
 
 /**
