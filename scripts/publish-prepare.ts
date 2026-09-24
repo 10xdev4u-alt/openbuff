@@ -172,10 +172,26 @@ const prepareStage = Effect.gen(function* () {
   // is the project root here) and materializes node_modules, which `npm pack`
   // then ships for every bundleDependencies entry — physically, pre-resolved,
   // immune to the client's own override policy.
-  const install = yield* ChildProcess.make(
-    "npm",
-    ["install", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"],
-    {
+  // #146 evidence: on CI runners the child install once sat 12 minutes with
+  // ZERO output (run 35994905306's timeout killed an orphan `npm install`);
+  // the same step takes ~35 s locally. npm's default fetch-retry ladder
+  // outlives the gate's kill window, so a stalled registry fetch hangs
+  // silently forever. These bounds turn any stall into a loud failure in
+  // ~3 minutes with npm's own error naming the host; CI adds info-level
+  // logging so the next hang self-describes.
+  const npmArgs = [
+    "install",
+    "--omit=dev",
+    "--ignore-scripts",
+    "--no-audit",
+    "--no-fund",
+    "--fetch-timeout=60000",
+    "--fetch-retries=2",
+    "--fetch-retry-mintimeout=15000",
+    "--fetch-retry-maxtimeout=60000",
+  ];
+  if (process.env.CI === "true") npmArgs.push("--loglevel=info");
+  const install = yield* ChildProcess.make("npm", npmArgs, {
       cwd: stageDir,
       stdout: "inherit",
       stderr: "inherit",
