@@ -49,12 +49,16 @@ import { makeManualOnlyProviderMaintenanceCapabilities } from "../providerMainte
  * renders. Reconciled to the live 6-row roster in #137 — the withdrawn rows
  * (v4-pro, minimax-m3, ox-alpha, glm-5.2, muse-spark-1.3, gemini-3.8-flash)
  * and god-only rows (kimi-k3-eco, luna-es) have no entry.
+ *
+ * The MiMo wire id is stable but the serving build moved: MiMo 2.6 Flash
+ * since 2026-09-21 under the unchanged id (same Xiaomi rate card to the
+ * cent), so the label carries the version the wire actually serves.
  */
 const FREEBUFF_MODEL_DISPLAY_NAME_BY_SLUG: Readonly<Record<string, string>> = {
   "z-ai/glm-5.3-flash": "GLM 5.3 Flash",
   "deepseek/deepseek-v4-flash": "DeepSeek V4.1 Flash",
   "openai/gpt-5.6-luna": "GPT-5.6 Luna",
-  "mimo/mimo-v2.5": "MiMo 2.5",
+  "mimo/mimo-v2.5": "MiMo 2.6 Flash",
   "upstage/solar-pro4": "Solar Pro 4",
   "meta/muse-spark-1.2-contributor": "Muse Spark 1.2",
 };

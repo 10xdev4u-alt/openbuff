@@ -53,7 +53,7 @@ describe("freebuffSnapshotModels", () => {
     expect(namesBySlug.get("z-ai/glm-5.3-flash")).toBe("GLM 5.3 Flash");
     expect(namesBySlug.get("deepseek/deepseek-v4-flash")).toBe("DeepSeek V4.1 Flash");
     expect(namesBySlug.get("openai/gpt-5.6-luna")).toBe("GPT-5.6 Luna");
-    expect(namesBySlug.get("mimo/mimo-v2.5")).toBe("MiMo 2.5");
+    expect(namesBySlug.get("mimo/mimo-v2.5")).toBe("MiMo 2.6 Flash");
     expect(namesBySlug.get("upstage/solar-pro4")).toBe("Solar Pro 4");
     expect(namesBySlug.get("meta/muse-spark-1.2-contributor")).toBe("Muse Spark 1.2");
   });
