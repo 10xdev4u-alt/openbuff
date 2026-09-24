@@ -13,7 +13,9 @@ import { Kbd } from "../ui/kbd";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
 import { modelPickerModelKey } from "./modelPickerKeys";
+import type { FreebuffPickerDisclosure } from "./modelPickerDisclosures";
 import type { FreebuffPickerPrice } from "./modelPickerPricing";
+import { ModelDataUseBadge } from "./ModelDataUseBadge";
 import { ModelPriceTag } from "./ModelPriceTag";
 
 export const ModelListRow = memo(function ModelListRow(props: {
@@ -43,6 +45,12 @@ export const ModelListRow = memo(function ModelListRow(props: {
    * doesn't price — those rows render unchanged.
    */
   pricing?: FreebuffPickerPrice | undefined;
+  /**
+   * Data-use disclosure for freebuff rows (issue: picker disclosures).
+   * Rendered beside the model name; undefined renders nothing, so
+   * non-freebuff and undisclosed rows are untouched.
+   */
+  dataUseDisclosure?: FreebuffPickerDisclosure | undefined;
   jumpLabel?: string | null;
   disabledReason?: string | null;
   onToggleFavorite: () => void;
@@ -84,6 +92,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
               New
             </span>
           ) : null}
+          <ModelDataUseBadge disclosure={props.dataUseDisclosure} />
         </div>
         {props.showProvider && (
           <div className="mt-1 flex items-center gap-1.5">

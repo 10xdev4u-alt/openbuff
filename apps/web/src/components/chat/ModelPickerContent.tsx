@@ -9,6 +9,7 @@ import { memo, useMemo, useState, useCallback, useEffect, useLayoutEffect, useRe
 import { ChevronRightIcon, SearchIcon } from "lucide-react";
 import { ModelListRow } from "./ModelListRow";
 import { freebuffPickerPricingForInstance, type FreebuffPickerPrice } from "./modelPickerPricing";
+import { freebuffPickerDisclosureFor, type FreebuffPickerDisclosure } from "./modelPickerDisclosures";
 import { ModelPickerSidebar } from "./ModelPickerSidebar";
 import {
   modelPickerLegacySectionKey,
@@ -56,6 +57,8 @@ type ModelPickerItem = {
   isLegacy?: boolean | undefined;
   /** Freebuff only: quote-derived pricing for the row (issue #126). */
   pricing?: FreebuffPickerPrice;
+  /** Freebuff only: data-use disclosure for the row (training/retention). */
+  dataUseDisclosure?: FreebuffPickerDisclosure;
 };
 
 const EMPTY_MODEL_JUMP_LABELS = new Map<string, string>();
@@ -229,6 +232,12 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                 model.slug,
               )
             : undefined;
+        // Freebuff rows carry the data-use disclosure (training/retention,
+        // contracts sets) beside the name — the discount and the 1M-context
+        // convenience are real, and so is what the supplier does with the
+        // prompts. Non-freebuff drivers skip the lookup entirely.
+        const dataUseDisclosure =
+          entry.driverKind === "freebuff" ? freebuffPickerDisclosureFor(model.slug) : undefined;
         out.push({
           slug: model.slug,
           name: model.name,
@@ -243,6 +252,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
             ? { continuationGroupKey: entry.continuationGroupKey }
             : {}),
           ...(pricing ? { pricing } : {}),
+          ...(dataUseDisclosure ? { dataUseDisclosure } : {}),
         });
       }
     }
@@ -783,6 +793,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                         useTriggerLabel={false}
                         showNewBadge={isModelPickerNewModel(model.driverKind, model.slug)}
                         pricing={model.pricing}
+                        dataUseDisclosure={model.dataUseDisclosure}
                         jumpLabel={modelJumpLabelByKey.get(modelKey) ?? null}
                         disabledReason={disabledReason}
                         onToggleFavorite={() => toggleFavorite(model.instanceId, model.slug)}

@@ -284,6 +284,18 @@ export const FREEBUFF_TRAINING_DATA_MODEL_SLUGS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Free rows whose supplier RETAINS the prompts sent through them without
+ * training on them — upstream carries this as the catalog row's `warning`
+ * string (2026-09-24 snapshot: Space Bunny Alpha's stealth host, "Anonymous
+ * provider retains prompts", `dataUse: 'service'` — the host keeps copies
+ * under its own terms; the disclosure is about retention, not training).
+ * A picker that offers the row must say so before the first prompt.
+ */
+export const FREEBUFF_PROMPT_RETENTION_MODEL_SLUGS: ReadonlySet<string> = new Set([
+  "stealth/space-bunny-alpha",
+]);
+
+/**
  * The base3 agent id to admit a session with for the requested model.
  * Unknown or absent models fall back to the flash root (the tier's default),
  * mirroring upstream's "resolve to the fallback model's root" rule.
