@@ -80,4 +80,32 @@ describe("formatModelUnavailableProse", () => {
     );
     expect(prose).not.toContain("back around");
   });
+
+  it("never offers a return time for a used limited offer (waiting is false advice)", () => {
+    // Upstream: a used personal trial cannot be replenished by waiting or
+    // upgrading — the prose must not suggest either.
+    const prose = formatModelUnavailableProse(
+      {
+        availableHours: "usually 09:00–17:00 UTC",
+        availableAt: "2026-09-16T15:30:00.000Z",
+        limitedOfferReason: "used",
+      },
+      NOW,
+    );
+    expect(prose).toMatch(/already been used/i);
+    expect(prose).toMatch(/will not bring it back/i);
+    expect(prose).not.toContain("back around");
+    expect(prose).not.toContain("usually 09:00");
+  });
+
+  it("carries the limitedOfferReason through the wire projection", async () => {
+    const res = await admit({
+      status: "model_unavailable",
+      requestedModel: "anthropic/claude-fable-5.1",
+      availableHours: "offer pool empty",
+      limitedOfferReason: "exhausted",
+    });
+    expect(res.status).toBe("model_unavailable");
+    expect(res.limitedOfferReason).toBe("exhausted");
+  });
 });
