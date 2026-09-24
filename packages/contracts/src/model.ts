@@ -221,6 +221,20 @@ export const FREEBUFF_FREE_MODEL_IDS: ReadonlyArray<string> = Object.keys(
 );
 
 /**
+ * Free rows whose supplier trains on the prompts and completions sent
+ * through them — upstream carries this as the catalog's
+ * `dataUse: 'training'` flag plus `FREEBUFF_AI_TRAINING_NOTICE` (2026-09-22
+ * snapshot: the Muse Spark Contributor rows). The discount IS the training
+ * grant, so a picker that offers the row must gate first use behind an
+ * explicit consent. Upstream's own trace-retention policy for these rows is
+ * "do not keep copies" — the disclosure is about the supplier's grant, not
+ * our storage.
+ */
+export const FREEBUFF_TRAINING_DATA_MODEL_SLUGS: ReadonlySet<string> = new Set([
+  "meta/muse-spark-1.2-contributor",
+]);
+
+/**
  * The base3 agent id to admit a session with for the requested model.
  * Unknown or absent models fall back to the flash root (the tier's default),
  * mirroring upstream's "resolve to the fallback model's root" rule.
