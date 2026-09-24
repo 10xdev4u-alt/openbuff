@@ -17,9 +17,13 @@ on:
 
 # #146: two dispatches must never overlap (run 1's mid-flight cancel was
 # indistinguishable from a collision at first look). Queued, never killed.
+# queue: max — GitHub's default holds ONE pending run per group and silently
+# cancels it when a third dispatch arrives (CodeRabbit, #148); that pending
+# cancel is the exact #146 blindness class, so the queue holds all of them.
 concurrency:
   group: publish-gate
   cancel-in-progress: false
+  queue: max
 
 jobs:
   tarball-smoke:
