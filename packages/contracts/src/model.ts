@@ -259,10 +259,11 @@ export const FREEBUFF_FREE_PICKER_MODEL_IDS: ReadonlyArray<string> = [
 ];
 
 /**
- * @deprecated Every selectable free-tier model id. Superseded by
- * `FREEBUFF_FREE_PICKER_MODEL_IDS` after the 2026-09-22/23 upstream retirements
- * made the pairing map and the picker diverge; kept because it is still the
- * exact key set of `FREEBUFF_FREE_AGENT_BY_MODEL`.
+ * Every ADMISSIBLE free-tier model id — the key set of
+ * `FREEBUFF_FREE_AGENT_BY_MODEL`, including the picker-retired drain rows
+ * (gpt-5.6-luna, solar-pro4), which a caller must NOT offer as fresh picks.
+ * Superseded by `FREEBUFF_FREE_PICKER_MODEL_IDS` after the 2026-09-22/23
+ * upstream retirements made the pairing map and the picker diverge.
  */
 export const FREEBUFF_FREE_MODEL_IDS: ReadonlyArray<string> = Object.keys(
   FREEBUFF_FREE_AGENT_BY_MODEL,

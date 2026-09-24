@@ -106,7 +106,7 @@ describe("FREEBUFF_FREE_AGENT_BY_MODEL", () => {
     expect(FREEBUFF_FREE_AGENT_BY_MODEL["upstage/solar-pro4"]).toBe("base3-free-solar-pro4");
   });
 
-  it("exposes every map key as a selectable model id", () => {
+  it("exposes every map key as an admissible model id (drain rows included)", () => {
     expect([...FREEBUFF_FREE_MODEL_IDS].sort()).toEqual(
       Object.keys(FREEBUFF_FREE_AGENT_BY_MODEL).sort(),
     );
