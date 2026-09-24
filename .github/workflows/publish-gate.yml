@@ -38,6 +38,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      # #146: the stage hang appeared after runner npm drifted to 11.19.0
+      # (reify-phase silence; green 09-22 on the older runner npm, and both
+      # npm 11 and 12 install the manifest in <1 min locally cold). Pin the
+      # child npm so the gate stops depending on GitHub's weekly bumps.
+      - name: Pin npm for the stage child
+        run: npm install -g npm@12.0.2 && npm --version
+
       # Build the exact artifacts the stage consumes (mirrors the Build job).
       - name: Build server bundle + web client
         timeout-minutes: 10
