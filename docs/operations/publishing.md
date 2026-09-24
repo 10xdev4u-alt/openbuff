@@ -50,7 +50,7 @@ Never publish a "hotfix" during the propagation window — the E409 you get back
 
 ## Gate failure modes (learned 2026-09-24, #146)
 
-- The gate's steps carry per-step timeouts and the diagnostics step fires on `failure() || cancelled()` — a step-timeout kill marks the run CANCELLED, and that is exactly when the logs matter most.
+- The gate's steps carry per-step timeouts and the diagnostics step fires on `failure() || cancelled()`. These are two different kill paths: a per-step TIMEOUT fails the step and the run (run 3's conclusion was `failure`, per the runner's StepsRunner), while an external CANCEL (run 1: user or API cancellation) marks the run CANCELLED — the diagnostics must fire on both, since each is exactly when the logs matter most.
 - The child `npm install` inside `scripts/publish-prepare.ts` runs with bounded fetch retries (`--fetch-timeout=60000 --fetch-retries=2 --fetch-retry-mintimeout=15000 --fetch-retry-maxtimeout=60000`) so a registry stall fails loudly in ~3 minutes instead of hanging past the kill window, and `--loglevel=silly` under CI so the last line names the failing operation.
 - The runner npm is PINNED (`npm install -g npm@12.0.2` before staging). An un-pinned runner npm drifted to 11.19.0 and hung the gate in the reify phase with zero local repro — deterministic tooling in CI or the runner's weekly drift becomes your incident.
 - Dispatch by workflow NAME ("Publish gate"); the concurrency group queues dispatches (`queue: max`, never cancels).
