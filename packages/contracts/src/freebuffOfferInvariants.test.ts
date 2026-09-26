@@ -95,4 +95,20 @@ describe("freebuffOfferViolations", () => {
   it("a nameless surface skips CHECK 5 entirely (opt-in check)", () => {
     expect(freebuffOfferViolations({ surface: "no catalog", offered: [DEFAULT_FREEBUFF_FREE_MODEL] })).toEqual([]);
   });
+
+  it("CHECK 5b: a WRONG label (another row's name) is caught by the expected lookup", () => {
+    // The GLM 5.2 Desktop shape upstream: the row rendered under the
+    // FALLBACK's label — wrong, not missing; every missing-name check
+    // passes it. Only the independent expected lookup sees it.
+    const out = freebuffOfferViolations({
+      surface: "mislabeled surface",
+      offered: [DEFAULT_FREEBUFF_FREE_MODEL],
+      nameFor: () => "DeepSeek V4.1 Flash",
+      expectedNameFor: () => "GLM 5.3 Flash",
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatch(/fallback-label shape/);
+    expect(out[0]).toContain("DeepSeek V4.1 Flash");
+    expect(out[0]).toContain("GLM 5.3 Flash");
+  });
 });

@@ -56,6 +56,13 @@ export interface FreebuffOfferSurface {
    *  map. A row without an entry renders as its raw slug — the fallback-
    *  label shape. Omit to skip the check. */
   readonly nameFor?: (model: string) => string | undefined;
+  /** An INDEPENDENT expected-name lookup (a hand-written literal in the
+   *  test, not the map under test). When both lookups are supplied, a
+   *  nonempty name that differs from the expected one is the worst label
+   *  shape of all: upstream's Desktop shipped the earned GLM 5.2 row
+   *  rendering under the FALLBACK's label — wrong, not missing, and every
+   *  missing-name check passes it. */
+  readonly expectedNameFor?: (model: string) => string | undefined;
 }
 
 /**
@@ -104,10 +111,23 @@ export function freebuffOfferViolations(surface: FreebuffOfferSurface): string[]
     }
 
     // 5. the row has to render as itself rather than as a raw slug or
-    // another model's label.
+    // another model's label — the wrong-label shape needs an independent
+    // expected lookup to catch, which is why it is opt-in.
     const name = surface.nameFor?.(model);
     if (surface.nameFor && (name === undefined || name === model)) {
       out.push(`${where} is offered but the surface's catalog has no display name for it`);
+    }
+    const expected = surface.expectedNameFor?.(model);
+    if (
+      surface.nameFor &&
+      surface.expectedNameFor &&
+      expected !== undefined &&
+      name !== undefined &&
+      name !== expected
+    ) {
+      out.push(
+        `${where} renders as "${name}" where the expected catalog says "${expected}" (the fallback-label shape)`,
+      );
     }
 
     return out;
