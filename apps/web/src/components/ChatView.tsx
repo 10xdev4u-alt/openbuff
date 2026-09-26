@@ -75,7 +75,14 @@ import { AsyncResult } from "effect/unstable/reactivity";
 import { isElectron } from "../env";
 import { readLocalApi } from "../localApi";
 import { resolveModelSwitchConfirmation } from "./chat/modelSwitchConfirmation.logic";
-import { resolveDataUseConsent } from "./chat/modelDataUseConsent.logic";
+import {
+  resolveDataUseConsent,
+  resolveDataUseConsentForSend,
+} from "./chat/modelDataUseConsent.logic";
+import {
+  readConsentedDataUseModelSlugs,
+  rememberConsentedDataUseModelSlug,
+} from "./chat/modelDataUseConsent.storage";
 import { useDiffPanelStore } from "../diffPanelStore";
 import {
   collapseExpandedComposerCursor,
@@ -5120,6 +5127,37 @@ function ChatViewContent(props: ChatViewProps) {
     if (composerRef.current?.validateProviderInput(outgoingMessageText) === false) {
       return;
     }
+    // Data-use consent on the send path (#157): the switch-time gate only
+    // fires when the user CHANGES models mid-thread, so a fresh thread whose
+    // composer was already pointed at a disclosed row never met a consent
+    // dialog before its first prompt went out. Consulted on every send; the
+    // per-model journal keeps already-consented rows silent, and a decline
+    // leaves the composer draft untouched — nothing has been consumed yet.
+    const sendConsent = resolveDataUseConsentForSend({
+      model: ctxSelectedModel,
+      models: ctxSelectedProviderModels,
+    });
+    if (sendConsent.action === "cancel") {
+      toastManager.add(
+        stackedThreadToast({
+          type: "warning",
+          title: "Model data-use consent unavailable",
+          description: sendConsent.message,
+        }),
+      );
+      return;
+    }
+    if (sendConsent.action === "confirm") {
+      const localApi = readLocalApi();
+      const consented =
+        (await localApi?.dialogs.confirm(sendConsent.message, {
+          variant: "default",
+        })) ?? false;
+      if (!consented) {
+        return;
+      }
+      rememberConsentedDataUseModelSlug(ctxSelectedModel);
+    }
 
     sendInFlightRef.current = true;
     if (isDraftHeroState && activeThreadKey) {
@@ -5601,6 +5639,34 @@ function ChatViewContent(props: ChatViewProps) {
         text: trimmed,
       });
 
+      // Same send-path data-use gate as the composer (#157) — the plan
+      // follow-up is a first send too when its thread never ran a turn.
+      const followUpConsent = resolveDataUseConsentForSend({
+        model: ctxSelectedModel,
+        models: ctxSelectedProviderModels,
+      });
+      if (followUpConsent.action === "cancel") {
+        toastManager.add(
+          stackedThreadToast({
+            type: "warning",
+            title: "Model data-use consent unavailable",
+            description: followUpConsent.message,
+          }),
+        );
+        return;
+      }
+      if (followUpConsent.action === "confirm") {
+        const localApi = readLocalApi();
+        const consented =
+          (await localApi?.dialogs.confirm(followUpConsent.message, {
+            variant: "default",
+          })) ?? false;
+        if (!consented) {
+          return;
+        }
+        rememberConsentedDataUseModelSlug(ctxSelectedModel);
+      }
+
       sendInFlightRef.current = true;
       beginLocalDispatch({ preparingWorktree: false });
       setThreadError(threadIdForSend, null);
@@ -5759,6 +5825,34 @@ function ChatViewContent(props: ChatViewProps) {
     });
     if (composerRef.current?.validateProviderInput(outgoingImplementationPrompt) === false) {
       return;
+    }
+    // Same send-path data-use gate as the composer (#157): the
+    // implementation thread is a brand-new thread whose first prompt would
+    // otherwise go out under the composer model's supplier terms unasked.
+    const implementationConsent = resolveDataUseConsentForSend({
+      model: ctxSelectedModel,
+      models: ctxSelectedProviderModels,
+    });
+    if (implementationConsent.action === "cancel") {
+      toastManager.add(
+        stackedThreadToast({
+          type: "warning",
+          title: "Model data-use consent unavailable",
+          description: implementationConsent.message,
+        }),
+      );
+      return;
+    }
+    if (implementationConsent.action === "confirm") {
+      const localApi = readLocalApi();
+      const consented =
+        (await localApi?.dialogs.confirm(implementationConsent.message, {
+          variant: "default",
+        })) ?? false;
+      if (!consented) {
+        return;
+      }
+      rememberConsentedDataUseModelSlug(ctxSelectedModel);
     }
     const nextThreadTitle = truncate(buildPlanImplementationThreadTitle(planMarkdown));
     const nextThreadModelSelection: ModelSelection = ctxSelectedModelSelection;
@@ -5975,6 +6069,9 @@ function ChatViewContent(props: ChatViewProps) {
       // arc): rows whose supplier trains on prompts/completions (the Muse
       // Spark discount) or retains them under its own terms (Space Bunny's
       // stealth host) gate switching onto them behind an explicit consent.
+      // Since #157 both gates share the per-model consent journal: a model
+      // consented on any path (send or switch) is never re-asked on the
+      // other.
       // Composed BEFORE the seat handoff below: a consent cancel must
       // leave everything untouched, and the handoff's confirm releases the
       // seat.
@@ -5986,7 +6083,8 @@ function ChatViewContent(props: ChatViewProps) {
         scheduleComposerFocus();
         return;
       }
-      if (consent.action === "confirm") {
+      const alreadyConsented = readConsentedDataUseModelSlugs().includes(resolvedModel);
+      if (consent.action === "confirm" && !alreadyConsented) {
         const localApi = readLocalApi();
         const consented = (await localApi?.dialogs.confirm(consent.message, {
           variant: "default",
@@ -5995,6 +6093,7 @@ function ChatViewContent(props: ChatViewProps) {
           scheduleComposerFocus();
           return;
         }
+        rememberConsentedDataUseModelSlug(resolvedModel);
       }
       if (confirmation.action === "confirm") {
         const localApi = readLocalApi();

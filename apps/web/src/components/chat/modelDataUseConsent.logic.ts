@@ -28,6 +28,10 @@ import {
   FREEBUFF_TRAINING_DATA_MODEL_SLUGS,
 } from "@t3tools/contracts";
 
+import {
+  readConsentedDataUseModelSlugs,
+} from "./modelDataUseConsent.storage";
+
 export type DataUseConsentDecision =
   | { readonly action: "proceed" }
   | { readonly action: "confirm"; readonly message: string }
@@ -53,6 +57,47 @@ export function resolveDataUseConsent(input: {
     });
   }
   return { action: "proceed" };
+}
+
+/**
+ * The send-path variant (the #157 gap): the switch-time gate fires only when
+ * the user CHANGES models mid-thread, so a fresh thread whose composer was
+ * pointed at a disclosed row before its first send — or any thread re-opened
+ * on one — never met a consent dialog. This resolver is consulted on every
+ * send and keys on the per-model consent journal instead of a one-shot
+ * thread-local flag:
+ *
+ *  - Undisclosed rows proceed untouched (the overwhelming majority of sends
+ *    must not gain a lookup or a dialog).
+ *  - A disclosed row with no recorded consent asks, with the SAME
+ *    training-distinct copy as the switch gate. The resolver is READ-ONLY:
+ *    the caller records the consent (see
+ *    `rememberConsentedDataUseModelSlug`) only after the user explicitly
+ *    accepts, so a decline — or a dialog that never rendered — leaves the
+ *    journal untouched and the next send re-asks. The ask cannot be waited
+ *    out, and a forgotten record fails toward asking, never toward silence.
+ *  - A recorded consent (this thread, another thread, a previous session)
+ *    proceeds — including when the picker has since lost the row, since the
+ *    consent predates the loss.
+ *
+ * Kept pure over the injected storage helpers so the gate stays testable
+ * without React, dialogs, or a live storage.
+ */
+export function resolveDataUseConsentForSend(input: {
+  readonly model: string;
+  readonly models: ReadonlyArray<{ readonly slug: string; readonly name: string }> | undefined;
+  readonly consents?: () => ReadonlyArray<string>;
+}): DataUseConsentDecision {
+  const disclosed =
+    FREEBUFF_TRAINING_DATA_MODEL_SLUGS.has(input.model) ||
+    FREEBUFF_PROMPT_RETENTION_MODEL_SLUGS.has(input.model);
+  if (!disclosed) return { action: "proceed" };
+  const readConsents = input.consents ?? readConsentedDataUseModelSlugs;
+  if (readConsents().includes(input.model)) return { action: "proceed" };
+  return resolveDataUseConsent({
+    nextModel: input.model,
+    models: input.models,
+  });
 }
 
 function decide(
