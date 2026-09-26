@@ -312,3 +312,10 @@ Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-o
 **Lesson (reusable rule)** | (1) Upstream comments that say "a client would be reading its own belief" are SPEC: find the field they justify and make your client read it — a census is a belief with a timestamp. (2) Locked ≠ inadmissible: per-viewer gates live in wire payloads, not catalogs; a row your catalog omits coerces someone who should have run it. (3) When one resolver becomes every gate's input, hoist it above its consumers and audit the useCallback chains — a memoized gate with a stale input is a lock that opens for the wrong person.
 **Graph nodes updated** | server-verdict row (#173).
 
+## 2026-09-26 — Fifth green gate: the runbook is now just Tuesday (#175, v0.0.41)
+**What I tried** | Ship 0.0.41 (etiquette guard + server-verdict lock) through the unchanged runbook.
+**What failed + evidence** | Nothing. The only operational note: my first triad command concatenated publish + republish in one line and the E409 grep caught the word "error" from the first command's noise — split the legs and read each receipt on its own.
+**What worked** | Gate green on 7494a9636, E409 acceptance, CDN in ~5 minutes, fresh-dir install + audit 0 + boot 200/200 with the #168 teardown shape landing first try. Five consecutive green gates since the #146 hardening — the release path is now infrastructure, not an event.
+**Lesson (reusable rule)** | A verification step that bundles two receipts into one output can misread its own evidence — one receipt per command, and grep for the EXPECTED string, not the absence of failure.
+**Graph nodes updated** | v0.0.41 release row (#171/#173 shipped).
+
