@@ -1,6 +1,6 @@
 {
   "name": "@princetheprogrammerbtw/openbuff",
-  "version": "0.0.38",
+  "version": "0.0.39",
   "description": "Open-source, ad-free web experience for Freebuff — a local server + web UI for the free AI coding agent, powered by the real Freebuff engine on your machine.",
   "keywords": [
     "ai",
