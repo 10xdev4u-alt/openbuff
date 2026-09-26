@@ -5661,6 +5661,22 @@ function ChatViewContent(props: ChatViewProps) {
     setActivePendingUserInputQuestionIndex(Math.max(activePendingProgress.questionIndex - 1, 0));
   }, [activePendingProgress, setActivePendingUserInputQuestionIndex]);
 
+  // The SERVER's per-viewer plan-required verdict for an instance, when its
+  // snapshot has captured one (upstream freebucks.planRequiredModelIds).
+  // Present = authoritative over the static census; absent = census fallback
+  // (older server). Every lock gate reads through this. Declared BEFORE the
+  // plan handlers so their dependency arrays can track it (a stale verdict
+  // would block an entitled viewer or admit a newly locked one — CodeRabbit
+  // functional-correctness finding, PR #173).
+  const planRequiredVerdictFor = useCallback(
+    (instanceId: ProviderInstanceId | undefined): ReadonlyArray<string> | undefined =>
+      instanceId === undefined
+        ? undefined
+        : providerStatuses.find((snapshot) => snapshot.instanceId === instanceId)?.usage
+            ?.freebucks?.planRequiredModelIds,
+    [providerStatuses],
+  );
+
   const onSubmitPlanFollowUp = useCallback(
     async ({
       text,
@@ -5868,6 +5884,7 @@ function ChatViewContent(props: ChatViewProps) {
       startThreadTurn,
       environmentId,
       composerRef,
+      planRequiredVerdictFor,
     ],
   );
 
@@ -6075,20 +6092,8 @@ function ChatViewContent(props: ChatViewProps) {
     startThreadTurn,
     environmentId,
     composerRef,
+    planRequiredVerdictFor,
   ]);
-
-  // The SERVER's per-viewer plan-required verdict for an instance, when its
-  // snapshot has captured one (upstream freebucks.planRequiredModelIds).
-  // Present = authoritative over the static census; absent = census fallback
-  // (older server). Every lock gate reads through this.
-  const planRequiredVerdictFor = useCallback(
-    (instanceId: ProviderInstanceId | undefined): ReadonlyArray<string> | undefined =>
-      instanceId === undefined
-        ? undefined
-        : providerStatuses.find((snapshot) => snapshot.instanceId === instanceId)?.usage
-            ?.freebucks?.planRequiredModelIds,
-    [providerStatuses],
-  );
 
   const getModelDisabledReason = useCallback(
     (instanceId: ProviderInstanceId, model: string): string | null => {
