@@ -16,6 +16,7 @@ import { modelPickerModelKey } from "./modelPickerKeys";
 import type { FreebuffPickerDisclosure } from "./modelPickerDisclosures";
 import type { FreebuffPickerPrice } from "./modelPickerPricing";
 import { ModelDataUseBadge } from "./ModelDataUseBadge";
+import { ModelPlanLockBadge } from "./ModelPlanLockBadge";
 import { ModelPriceTag } from "./ModelPriceTag";
 
 export const ModelListRow = memo(function ModelListRow(props: {
@@ -51,6 +52,13 @@ export const ModelListRow = memo(function ModelListRow(props: {
    * non-freebuff and undisclosed rows are untouched.
    */
   dataUseDisclosure?: FreebuffPickerDisclosure | undefined;
+  /**
+   * Tier-locked freebuff row (upstream freebuffPlanRequired): drawn with
+   * the Paid plan badge; the row is disabled by the picker's lock gate.
+   */
+  planRequired?: boolean | undefined;
+  /** The plan-required sentence naming the model (badge title). */
+  planRequiredLine?: string | undefined;
   jumpLabel?: string | null;
   disabledReason?: string | null;
   onToggleFavorite: () => void;
@@ -93,6 +101,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
             </span>
           ) : null}
           <ModelDataUseBadge disclosure={props.dataUseDisclosure} />
+          <ModelPlanLockBadge planRequired={props.planRequired} line={props.planRequiredLine} />
         </div>
         {props.showProvider && (
           <div className="mt-1 flex items-center gap-1.5">

@@ -15,8 +15,8 @@
  * @module provider/Drivers/FreebuffDriver
  */
 import {
-  DEFAULT_FREEBUFF_FREE_MODEL,
-  FREEBUFF_FREE_PICKER_MODEL_IDS,
+  DEFAULT_FREEBUFF_FREE_MODEL,   FREEBUFF_FREE_PICKER_MODEL_IDS,
+   FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS_ORDERED,
   FreebuffSettings,
   ProviderDriverKind,
   type FreebuffProviderUsage,
@@ -67,6 +67,16 @@ const FREEBUFF_MODEL_DISPLAY_NAME_BY_SLUG: Readonly<Record<string, string>> = {
   "upstage/solar-pro4": "Solar Pro 4",
   "stealth/space-bunny-alpha": "Space Bunny Alpha",
   "meta/muse-spark-1.2-contributor": "Muse Spark 1.2",
+  // Tier-LOCKED rows: LISTED, not hidden (upstream's freebuffPlanRequired
+  // doctrine, common/src/util/freebuff-model-selection.ts) — the thing
+  // standing between the user and the row is a plan we do not sell here,
+  // and hiding it gives the upgrade nothing to point at. The web picker
+  // draws them disabled with FREEBUFF_PLAN_REQUIRED_LINE; admission would
+  // refuse them regardless, and the contracts offer-without-gate test pins
+  // that none of these is servable.
+  "openai/gpt-6-luna": "GPT-6 Luna",
+  "mimo/mimo-v2.6-pro": "MiMo 2.6 Pro",
+  "google/gemini-3.8-flash": "Gemini 3.8 Flash",
 };
 
 /**
@@ -79,13 +89,28 @@ const FREEBUFF_MODEL_DISPLAY_NAME_BY_SLUG: Readonly<Record<string, string>> = {
  * options); the adapter derives the agent per selected slug.
  */
 export function freebuffSnapshotModels(): ReadonlyArray<ServerProviderModel> {
-  return FREEBUFF_FREE_PICKER_MODEL_IDS.map((slug) => ({
-    slug,
-    name: FREEBUFF_MODEL_DISPLAY_NAME_BY_SLUG[slug] ?? slug,
-    isCustom: false,
-    capabilities: null,
-    ...(slug === DEFAULT_FREEBUFF_FREE_MODEL ? { isDefault: true } : {}),
-  }));
+  return [
+    ...FREEBUFF_FREE_PICKER_MODEL_IDS.map((slug) => ({
+      slug,
+      name: FREEBUFF_MODEL_DISPLAY_NAME_BY_SLUG[slug] ?? slug,
+      isCustom: false,
+      // Explicit `false` so the picker's legacy section never claims a
+      // current row just because a sibling carries `isLegacy: true`.
+      isLegacy: false,
+      capabilities: null,
+      ...(slug === DEFAULT_FREEBUFF_FREE_MODEL ? { isDefault: true } : {}),
+    })),
+    ...FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS_ORDERED.map((slug) => ({
+      slug,
+      name: FREEBUFF_MODEL_DISPLAY_NAME_BY_SLUG[slug] ?? slug,
+      isCustom: false,
+      // NOT legacy — these rows are tier-locked, drawn INLINE and disabled
+      // (upstream draws them listed with a plan-required label, never behind
+      // a collapsed/legacy section; that would be hiding again).
+      isLegacy: false,
+      capabilities: null,
+    })),
+  ];
 }
 import type { ServerProviderShape } from "../Services/ServerProvider.ts";
 import { makeFreebuffAdapter } from "../Services/FreebuffAdapter.ts";

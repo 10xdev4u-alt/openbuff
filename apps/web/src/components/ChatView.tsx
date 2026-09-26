@@ -79,6 +79,7 @@ import {
   resolveDataUseConsent,
   resolveDataUseConsentForSend,
 } from "./chat/modelDataUseConsent.logic";
+import { resolveLockedModelBlock } from "./chat/modelLockedRow.logic";
 import {
   readConsentedDataUseModelSlugs,
   rememberConsentedDataUseModelSlug,
@@ -5127,6 +5128,24 @@ function ChatViewContent(props: ChatViewProps) {
     if (composerRef.current?.validateProviderInput(outgoingMessageText) === false) {
       return;
     }
+    // Tier-locked rows never send (upstream's offer-without-gate law,
+    // send-path half): a sticky pick from an older binary must hit this
+    // refusal, not the server's admission gate.
+    const lockedBlock = resolveLockedModelBlock({
+      driverKind: ctxSelectedProvider,
+      model: ctxSelectedModel,
+      models: ctxSelectedProviderModels,
+    });
+    if (lockedBlock) {
+      toastManager.add(
+        stackedThreadToast({
+          type: "warning",
+          title: "Model locked to a paid plan",
+          description: lockedBlock.line,
+        }),
+      );
+      return;
+    }
     // Data-use consent on the send path (#157): the switch-time gate only
     // fires when the user CHANGES models mid-thread, so a fresh thread whose
     // composer was already pointed at a disclosed row never met a consent
@@ -5639,6 +5658,22 @@ function ChatViewContent(props: ChatViewProps) {
         text: trimmed,
       });
 
+      // Tier-locked rows never send — same gate as the composer leg.
+      const lockedBlock = resolveLockedModelBlock({
+        driverKind: ctxSelectedProvider,
+        model: ctxSelectedModel,
+        models: ctxSelectedProviderModels,
+      });
+      if (lockedBlock) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "warning",
+            title: "Model locked to a paid plan",
+            description: lockedBlock.line,
+          }),
+        );
+        return;
+      }
       // Same send-path data-use gate as the composer (#157) — the plan
       // follow-up is a first send too when its thread never ran a turn.
       const followUpConsent = resolveDataUseConsentForSend({
@@ -5826,6 +5861,23 @@ function ChatViewContent(props: ChatViewProps) {
     if (composerRef.current?.validateProviderInput(outgoingImplementationPrompt) === false) {
       return;
     }
+    // Tier-locked rows never send — same gate as the composer leg; the
+    // implementation thread is a brand-new thread on the composer model.
+    const lockedBlock = resolveLockedModelBlock({
+      driverKind: ctxSelectedProvider,
+      model: ctxSelectedModel,
+      models: ctxSelectedProviderModels,
+    });
+    if (lockedBlock) {
+      toastManager.add(
+        stackedThreadToast({
+          type: "warning",
+          title: "Model locked to a paid plan",
+          description: lockedBlock.line,
+        }),
+      );
+      return;
+    }
     // Same send-path data-use gate as the composer (#157): the
     // implementation thread is a brand-new thread whose first prompt would
     // otherwise go out under the composer model's supplier terms unasked.
@@ -5976,6 +6028,22 @@ function ChatViewContent(props: ChatViewProps) {
 
   const getModelDisabledReason = useCallback(
     (instanceId: ProviderInstanceId, model: string): string | null => {
+      // Tier-locked freebuff rows draw DISABLED in the picker (upstream's
+      // freebuffPlanRequired doctrine — listed, not hidden): the tooltip
+      // names the gate instead of the row vanishing from the list. The
+      // lock is thread-independent, so it precedes the draft-state checks.
+      const lockedEntry = providerStatuses.find((snapshot) => snapshot.instanceId === instanceId);
+      const lockedBlock =
+        lockedEntry?.driver !== undefined
+          ? resolveLockedModelBlock({
+              driverKind: lockedEntry.driver,
+              model,
+              models: lockedEntry.models,
+            })
+          : null;
+      if (lockedBlock) {
+        return lockedBlock.line;
+      }
       if (!activeThread) {
         return null;
       }
@@ -6034,6 +6102,27 @@ function ChatViewContent(props: ChatViewProps) {
         instanceId,
         model: resolvedModel,
       };
+      // Switch-path defense for tier-locked rows: the picker draws them
+      // disabled, but slash/keyboard paths reach this handler directly.
+      const switchLockedBlock =
+        resolvedDriverKind !== null
+          ? resolveLockedModelBlock({
+              driverKind: resolvedDriverKind,
+              model: resolvedModel,
+              models: entry?.models,
+            })
+          : null;
+      if (switchLockedBlock) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "warning",
+            title: "Model locked to a paid plan",
+            description: switchLockedBlock.line,
+          }),
+        );
+        scheduleComposerFocus();
+        return;
+      }
       const modelChangeBlockReason = getStartedThreadModelChangeBlockReason({
         providers: providerStatuses,
         hasStartedSession: activeThread.session !== null,

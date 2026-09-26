@@ -313,6 +313,45 @@ export const FREEBUFF_PROMPT_RETENTION_MODEL_SLUGS: ReadonlySet<string> = new Se
 ]);
 
 /**
+ * The locked row's picker sentence. Mirrors upstream's
+ * `FREEBUFF_PLAN_REQUIRED_LINE` (common/src/util/freebuff-model-selection.ts):
+ * listed, not hidden — the thing standing between the user and the row is a
+ * plan, and hiding it gives the upgrade nothing to point at. The server
+ * refuses the admission regardless; this only decides what the picker draws.
+ */
+export const FREEBUFF_PLAN_REQUIRED_LINE = "Included with a paid plan.";
+
+/**
+ * Free rows this tier's admission gate REFUSES: a fresh pick would be
+ * declined at admission (pro-only, or plan-only at LIMITED access —
+ * upstream's `FREEBUFF_LIMITED_TIER_PLAN_ONLY_MODEL_IDS`, census
+ * 2026-09-26). These rows are LISTED, not hidden: the picker draws them
+ * LOCKED (disabled with this line as the reason) exactly like upstream's
+ * `freebuffPlanRequired` — and the offer-without-gate invariant in the
+ * tests pins that a slug here must never be servable (`resolveFreebuffServedModel`
+ * answers undefined; the adapter suite coerces; the session gate never sees
+ * a mismatch).
+ */
+/**
+ * Stable display order for the locked rows (upstream FREEBUFF_MODELS order:
+ * gpt-6-luna sits where 5.6 sat, then the MiMo pro row, then the pro-only
+ * Gemini). The set above derives from this array so the two cannot diverge.
+ */
+export const FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS_ORDERED: ReadonlyArray<string> = [
+  "openai/gpt-6-luna",
+  "mimo/mimo-v2.6-pro",
+  "google/gemini-3.8-flash",
+];
+
+export const FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS: ReadonlySet<string> = new Set(
+  FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS_ORDERED,
+);
+
+export function isFreebuffPlanRequiredModel(model: string): boolean {
+  return FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS.has(model);
+}
+
+/**
  * The base3 agent id to admit a session with for the requested model.
  * Unknown or absent models fall back to the flash root (the tier's default),
  * mirroring upstream's "resolve to the fallback model's root" rule.

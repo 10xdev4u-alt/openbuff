@@ -5,12 +5,19 @@ import { DEFAULT_FREEBUFF_FREE_MODEL, FREEBUFF_FREE_PICKER_MODEL_IDS } from "@t3
 import { freebuffSnapshotModels } from "./FreebuffDriver.ts";
 
 describe("freebuffSnapshotModels", () => {
-  it("serves exactly the free-tier picker rows", () => {
+  it("serves exactly the picker rows plus the listed locked rows", () => {
     const models = freebuffSnapshotModels();
     expect(models.map((model) => model.slug).sort()).toEqual(
-      [...FREEBUFF_FREE_PICKER_MODEL_IDS].sort(),
+      [
+        ...FREEBUFF_FREE_PICKER_MODEL_IDS,
+        // Listed, not hidden (upstream freebuffPlanRequired): tier-locked
+        // rows render disabled in the picker instead of vanishing.
+        "google/gemini-3.8-flash",
+        "mimo/mimo-v2.6-pro",
+        "openai/gpt-6-luna",
+      ].sort(),
     );
-    expect(models).toHaveLength(7);
+    expect(models).toHaveLength(10);
   });
 
   it("carries only upstream-live free rows (re-verified 2026-09-26)", () => {
@@ -19,7 +26,6 @@ describe("freebuffSnapshotModels", () => {
     const slugs = freebuffSnapshotModels().map((model) => model.slug);
     for (const dead of [
       "stealth/ox-alpha",
-      "google/gemini-3.8-flash",
       "meta/muse-spark-1.3-contributor",
       "minimax/minimax-m3",
       "deepseek/deepseek-v4-pro",
@@ -28,10 +34,6 @@ describe("freebuffSnapshotModels", () => {
       "openai/gpt-5.6-luna-es",
       // Paused 2026-09-24 (stage two): nothing needs it admitted any more.
       "openai/gpt-5.6-luna",
-      // Plan-only at this tier's access level (upstream 2026-09-25 rule);
-      // gpt-6-luna joined that set with mimo-v2.6-pro.
-      "openai/gpt-6-luna",
-      "mimo/mimo-v2.6-pro",
       // Limited-offer row: server-pushed only, never a client picker row.
       "anthropic/claude-fable-5.1",
     ]) {
@@ -75,7 +77,21 @@ describe("freebuffSnapshotModels", () => {
     for (const model of freebuffSnapshotModels()) {
       expect(model.isCustom).toBe(false);
       expect(model.capabilities).toBeNull();
-      expect(model.isLegacy).toBeUndefined();
+    }
+  });
+
+  it("lists the tier-locked rows inline, never as legacy", () => {
+    // Upstream's doctrine: LISTED, not hidden — locked rows draw inline
+    // and disabled (the web picker's lock gate), never behind a collapsed
+    // legacy section, and never flagged legacy (they are not legacy; they
+    // are gated). Servable rows carry explicit isLegacy:false so a legacy
+    // sibling can never claim them either.
+    const bySlug = new Map(freebuffSnapshotModels().map((m) => [m.slug, m] as const));
+    for (const locked of ["openai/gpt-6-luna", "mimo/mimo-v2.6-pro", "google/gemini-3.8-flash"]) {
+      expect(bySlug.get(locked)?.isLegacy, locked).toBe(false);
+    }
+    for (const slug of FREEBUFF_FREE_PICKER_MODEL_IDS) {
+      expect(bySlug.get(slug)?.isLegacy, slug).toBe(false);
     }
   });
 });
