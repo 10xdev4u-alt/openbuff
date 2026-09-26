@@ -199,14 +199,15 @@ export const DEFAULT_MODEL_BY_PROVIDER: Partial<Record<ProviderDriverKind, strin
  *    client-side coercion is our share of it.
  *  - solar-pro4 RETURNED to the picker 2026-09-25 (10 Freebucks, beside
  *    solar-mini4 in the pinned Upstage lane) — back to a fresh pick here.
- *  - gpt-6-luna (premium, flex lane) and the NEW mimo/mimo-v2.6-pro row are
- *    open to every full-access account since 2026-09-25 but remain PLAN-ONLY
- *    at LIMITED access (upstream `FREEBUFF_LIMITED_TIER_PLAN_ONLY_MODEL_IDS`)
- *    — the free tier's gate, so both are dropped here despite holding
- *    upstream roots (`base3-free-luna-6`, `base3-free-mimo-2-6-pro`). The
- *    09-24 census wrongly listed gpt-6-luna: it sat behind the retired
- *    US-or-paid exemption then, and behind a plan at this tier before and
- *    since.
+ *  - gpt-6-luna (premium, flex lane) and the mimo/mimo-v2.6-pro row are
+ *    open to every full-access account since 2026-09-25 and PLAN-ONLY at
+ *    LIMITED access (upstream `FREEBUFF_LIMITED_TIER_PLAN_ONLY_MODEL_IDS`)
+ *    — they hold ADMITTING rows here (mirroring upstream's pairing map
+ *    exactly) while the LOCK set + server verdict decide who may freshly
+ *    select them (#166 doctrine: listed, not hidden; admission-refused per
+ *    viewer, not per catalog). The 09-24 census wrongly listed gpt-6-luna
+ *    as freely selectable: it sat behind the retired US-or-paid exemption
+ *    then, and behind a plan at this tier before and since.
  *  - muse-spark-1.2 carries the AI-training disclosure pair (`dataUse:
  *    'training'`); upstream keeps its 1.3 sibling and the withdrawn-era rows
  *    (deepseek-v4-pro, minimax-m3, glm-5.2, ox-alpha) in its PAUSED list.
@@ -250,6 +251,15 @@ export const FREEBUFF_FREE_AGENT_BY_MODEL: Readonly<Record<string, string>> = {
   "upstage/solar-mini4": "base3-free-solar-mini4",
   "stealth/space-bunny-alpha": "base3-free-space-bunny-alpha",
   "meta/muse-spark-1.2-contributor": "base3-free-muse-spark",
+  // Tier-LOCKED but ADMISSIBLE (upstream keeps both in its pairing map):
+  // plan-only at LIMITED access is a per-viewer gate the SERVER resolves
+  // (freebucks.planRequiredModelIds), not an absence of a free-mode route.
+  // A sticky pick from an entitled viewer must run the REAL model, not
+  // coerce; a limited viewer's pick is refused by the server with the
+  // plan-required prose — which our gate renders client-side first.
+  "openai/gpt-6-luna": "base3-free-luna-6",
+  "mimo/mimo-v2.6-pro": "base3-free-mimo-2-6-pro",
+  "google/gemini-3.8-flash": "base3-free-gemini-3-8-flash",
   // Picker-retired but still admissible: sessions admitted while it was out
   // of the picker (2026-09-23 → 2026-09-25) drain on it (upstream keeps the
   // row and its root in FREE_MODE_AGENT_MODELS for exactly this; a dropped

@@ -64,4 +64,49 @@ describe("resolveLockedModelBlock", () => {
     expect(block).not.toBeNull();
     expect(block?.line).toMatch(/paid plan/i);
   });
+
+  it("the SERVER's per-viewer verdict wins over the static census when present", () => {
+    // Upstream freebuffPlanRequired: the decision turns on the access tier
+    // (and once, the country) — a client deciding for itself would be
+    // reading its own belief. planRequiredModelIds present = authoritative.
+    // A slug the static census never locked can be locked for THIS viewer...
+    const widened = resolveLockedModelBlock({
+      driverKind: FREEBUFF,
+      model: "upstage/solar-mini4",
+      models: MODELS,
+      planRequiredModelIds: ["upstage/solar-mini4"],
+    });
+    expect(widened).not.toBeNull();
+    expect(widened?.line).toMatch(/paid plan/i);
+    // ...and a static-census lock can be LIFTED for a viewer the server
+    // says may open the row.
+    const lifted = resolveLockedModelBlock({
+      driverKind: FREEBUFF,
+      model: "openai/gpt-6-luna",
+      models: MODELS,
+      planRequiredModelIds: [],
+    });
+    expect(lifted).toBeNull();
+  });
+
+  it("an absent server verdict falls back to the static census (old-server law)", () => {
+    // Upstream: absent means "fall back to the static paid-only list" —
+    // what every client did before the field existed.
+    expect(
+      resolveLockedModelBlock({
+        driverKind: FREEBUFF,
+        model: "openai/gpt-6-luna",
+        models: MODELS,
+        planRequiredModelIds: undefined,
+      }),
+    ).not.toBeNull();
+    expect(
+      resolveLockedModelBlock({
+        driverKind: FREEBUFF,
+        model: "mimo/mimo-v2.5",
+        models: MODELS,
+        planRequiredModelIds: undefined,
+      }),
+    ).toBeNull();
+  });
 });

@@ -225,6 +225,12 @@ export const FreebuffProviderFreebucks = Schema.Struct({
   ),
   /** Per-model policy taglines, server-authored prose (#129). */
   priceNotices: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  /** Rows THIS viewer must buy a plan to open — the server's per-viewer
+   *  verdict (upstream `freebucks.planRequiredModelIds`). Present =
+   *  authoritative: the decision turns on the resolved access tier (and once,
+   *  the country), which only the server knows. Absent (older server, or a
+   *  viewer no row is gated for) = fall back to the static census set. */
+  planRequiredModelIds: Schema.optional(Schema.Array(Schema.String)),
   /** Recurring server-owned price windows (#129). */
   offPeak: Schema.optional(
     Schema.Record(

@@ -165,6 +165,10 @@ export interface FreebuffSessionFreebucks {
   };
   /** Per-model policy taglines (issue #129, wire pass-through). */
   readonly priceNotices?: Record<string, string>;
+  /** The server's per-viewer plan-required verdict (#166 wire pass-through):
+   *  rows THIS viewer must buy a plan to open. Present = authoritative over
+   *  the static census; absent = older server (census fallback applies). */
+  readonly planRequiredModelIds?: readonly string[];
   /** Recurring server-owned price windows (issue #129, wire pass-through). */
   readonly offPeak?: Record<
     string,

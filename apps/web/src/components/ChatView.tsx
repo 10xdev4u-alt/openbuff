@@ -5041,6 +5041,7 @@ function ChatViewContent(props: ChatViewProps) {
         driverKind: ctxSelectedProvider,
         model: ctxSelectedModel,
         models: ctxSelectedProviderModels,
+        planRequiredModelIds: planRequiredVerdictFor(ctxSelectedModelSelection.instanceId),
       });
       if (followUpLockedBlock) {
         toastManager.add(
@@ -5175,11 +5176,14 @@ function ChatViewContent(props: ChatViewProps) {
     }
     // Tier-locked rows never send (upstream's offer-without-gate law,
     // send-path half): a sticky pick from an older binary must hit this
-    // refusal, not the server's admission gate.
+    // refusal, not the server's admission gate. The server's per-viewer
+    // verdict overrides the static census when the snapshot has one — an
+    // entitled viewer's sticky pick passes and the real admission decides.
     const lockedBlock = resolveLockedModelBlock({
       driverKind: ctxSelectedProvider,
       model: ctxSelectedModel,
       models: ctxSelectedProviderModels,
+      planRequiredModelIds: planRequiredVerdictFor(ctxSelectedModelSelection.instanceId),
     });
     if (lockedBlock) {
       toastManager.add(
@@ -5708,6 +5712,7 @@ function ChatViewContent(props: ChatViewProps) {
         driverKind: ctxSelectedProvider,
         model: ctxSelectedModel,
         models: ctxSelectedProviderModels,
+        planRequiredModelIds: planRequiredVerdictFor(ctxSelectedModelSelection.instanceId),
       });
       if (lockedBlock) {
         toastManager.add(
@@ -5912,6 +5917,7 @@ function ChatViewContent(props: ChatViewProps) {
       driverKind: ctxSelectedProvider,
       model: ctxSelectedModel,
       models: ctxSelectedProviderModels,
+      planRequiredModelIds: planRequiredVerdictFor(ctxSelectedModelSelection.instanceId),
     });
     if (lockedBlock) {
       toastManager.add(
@@ -6071,6 +6077,19 @@ function ChatViewContent(props: ChatViewProps) {
     composerRef,
   ]);
 
+  // The SERVER's per-viewer plan-required verdict for an instance, when its
+  // snapshot has captured one (upstream freebucks.planRequiredModelIds).
+  // Present = authoritative over the static census; absent = census fallback
+  // (older server). Every lock gate reads through this.
+  const planRequiredVerdictFor = useCallback(
+    (instanceId: ProviderInstanceId | undefined): ReadonlyArray<string> | undefined =>
+      instanceId === undefined
+        ? undefined
+        : providerStatuses.find((snapshot) => snapshot.instanceId === instanceId)?.usage
+            ?.freebucks?.planRequiredModelIds,
+    [providerStatuses],
+  );
+
   const getModelDisabledReason = useCallback(
     (instanceId: ProviderInstanceId, model: string): string | null => {
       // Tier-locked freebuff rows draw DISABLED in the picker (upstream's
@@ -6084,6 +6103,7 @@ function ChatViewContent(props: ChatViewProps) {
               driverKind: lockedEntry.driver,
               model,
               models: lockedEntry.models,
+              planRequiredModelIds: lockedEntry?.usage?.freebucks?.planRequiredModelIds,
             })
           : null;
       if (lockedBlock) {
@@ -6155,6 +6175,7 @@ function ChatViewContent(props: ChatViewProps) {
               driverKind: resolvedDriverKind,
               model: resolvedModel,
               models: entry?.models,
+              planRequiredModelIds: entry?.usage?.freebucks?.planRequiredModelIds,
             })
           : null;
       if (switchLockedBlock) {

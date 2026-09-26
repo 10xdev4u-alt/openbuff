@@ -1,6 +1,5 @@
 import {
   FREEBUFF_PLAN_REQUIRED_LINE,
-  isFreebuffPlanRequiredModel,
   type ProviderInstanceId,
   type ProviderDriverKind,
   type ResolvedKeybindingsConfig,
@@ -13,6 +12,7 @@ import { ModelListRow } from "./ModelListRow";
 import { ModelPlanLockBadge } from "./ModelPlanLockBadge";
 import { freebuffPickerPricingForInstance, type FreebuffPickerPrice } from "./modelPickerPricing";
 import { freebuffPickerDisclosureFor, type FreebuffPickerDisclosure } from "./modelPickerDisclosures";
+import { resolveLockedModelBlock } from "./modelLockedRow.logic";
 import { ModelPickerSidebar } from "./ModelPickerSidebar";
 import {
   modelPickerLegacySectionKey,
@@ -247,13 +247,22 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
         const dataUseDisclosure =
           entry.driverKind === "freebuff" ? freebuffPickerDisclosureFor(model.slug) : undefined;
         // Tier-locked freebuff rows carry the plan-lock marker (upstream's
-        // freebuffPlanRequired doctrine: listed, not hidden). The row draws
-        // disabled with the same sentence as its tooltip reason.
-        const planRequired =
-          entry.driverKind === "freebuff" ? isFreebuffPlanRequiredModel(model.slug) : false;
-        const planRequiredLine = planRequired
-          ? `${model.name} ${FREEBUFF_PLAN_REQUIRED_LINE.toLowerCase()}`
-          : undefined;
+        // freebuffPlanRequired doctrine: listed, not hidden). The SERVER's
+        // per-viewer verdict (snapshot freebucks.planRequiredModelIds) is
+        // authoritative when present; the static census is the fallback for
+        // older servers. The row draws disabled with the same sentence as
+        // its tooltip reason.
+        const lockedBlock =
+          entry.driverKind === "freebuff"
+            ? resolveLockedModelBlock({
+                driverKind: entry.driverKind,
+                model: model.slug,
+                models: models.map((candidate) => ({ slug: candidate.slug, name: candidate.name })),
+                planRequiredModelIds: entry.snapshot.usage?.freebucks?.planRequiredModelIds,
+              })
+            : null;
+        const planRequired = lockedBlock !== null;
+        const planRequiredLine = lockedBlock?.line;
         out.push({
           slug: model.slug,
           name: model.name,

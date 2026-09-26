@@ -127,12 +127,14 @@ it.layer(NodeServices.layer)(
 
     it.effect("admits with the raw pick when the pairing map can serve it", () =>
       Effect.gen(function* () {
-        // Picker rows AND drain rows (#143): both are servable, so the
-        // header carries the pick itself — upstream serves exactly what it
-        // admitted.
+        // Picker rows AND drain rows AND tier-locked rows (#143, #166
+        // doctrine): all are ADMITTING — the lock is per-viewer, resolved by
+        // the server — so the header carries the pick itself and upstream
+        // serves (or refuses, per viewer) exactly what was admitted.
         for (const model of [
           "upstage/solar-mini4",
           "upstage/solar-pro4",
+          "openai/gpt-6-luna",
           "z-ai/glm-5.3-flash",
         ]) {
           const { fetch, posts } = makeCoherenceFetch();
@@ -163,7 +165,6 @@ it.layer(NodeServices.layer)(
           "stealth/ox-alpha",
           "minimax/minimax-m3",
           "openai/gpt-5.6-luna",
-          "openai/gpt-6-luna",
           "acme/nonexistent",
         ]) {
           const { fetch, posts } = makeCoherenceFetch();
