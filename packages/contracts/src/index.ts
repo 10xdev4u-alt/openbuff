@@ -12,6 +12,7 @@ export * from "./provider.ts";
 export * from "./providerInstance.ts";
 export * from "./providerRuntime.ts";
 export * from "./model.ts";
+export * from "./freebuffOfferInvariants.ts";
 export * from "./freebuffDiscount.ts";
 export * from "./freebuffPricePolicy.ts";
 export * from "./keybindings.ts";
