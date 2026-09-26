@@ -319,3 +319,10 @@ Graph nodes updated: task-log rows for #55 rounds 1–2 and this entry's close-o
 **Lesson (reusable rule)** | A verification step that bundles two receipts into one output can misread its own evidence — one receipt per command, and grep for the EXPECTED string, not the absence of failure.
 **Graph nodes updated** | v0.0.41 release row (#171/#173 shipped).
 
+## 2026-09-26 — Importing the discipline, not just the doctrine (#177)
+**What I tried** | The comments kept citing `common/src/testing/freebuff-offer-invariants.ts` as the thing "that exists to catch the offer-without-gate shape" — so fetch the cited file and port the checks, not the prose.
+**What failed + evidence** | Two of my test expectations were wrong before the checker was right. First, the double-drift case: I expected the lock AND root violations, but #173 had given every row its own root — only the lock fires now, which is the corrected doctrine working (my assertion was a fossil of the old map). Second, CodeRabbit caught the checker's blind spot: my missing-label check accepted ANOTHER model's nonempty label — the exact GLM 5.2 Desktop incident upstream documented (earned row rendered under the fallback's label). Wrong ≠ missing, and only an independent expected lookup sees the difference.
+**What worked** | `freebuffOfferViolations` in contracts with six checks wired to OUR gates, applied to three surfaces in their own tests, seeded violations for every check. One surprise from upstream's shape: an empty offer set is a violation — the test that wires itself to the wrong list is the failure a green run hides.
+**Lesson (reusable rule)** | (1) An invariant cited in a comment is executable somewhere — find the file, port the checks, and wire them to the surfaces that must hold. (2) A checker that has never failed is a mirror: seed its violations or it tests nothing but the happy list. (3) Wrong and missing are different failure shapes — "not undefined" is not "correct"; verify labels against an independent expectation.
+**Graph nodes updated** | offer-invariants row (#177).
+
