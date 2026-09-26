@@ -7,7 +7,11 @@ import * as NodePath from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 
 import { FREEBUFF_REVIEWER_AGENT_ID, makeFreebuffAgentSuite } from "./FreebuffAdapter.js";
-import { DEFAULT_FREEBUFF_FREE_MODEL, FREEBUFF_FREE_AGENT_BY_MODEL } from "@t3tools/contracts";
+import {
+  DEFAULT_FREEBUFF_FREE_MODEL,
+  freebuffOfferViolations,
+  FREEBUFF_FREE_AGENT_BY_MODEL,
+} from "@t3tools/contracts";
 
 /**
  * Wire contract for the OpenBuff subagent suite (#108).
@@ -109,6 +113,19 @@ describe("freebuff subagent suite (#108)", () => {
     expect(FREEBUFF_FREE_AGENT_BY_MODEL[DEFAULT_FREEBUFF_FREE_MODEL]).toBe(
       "base3-free-glm-5-3-flash",
     );
+  });
+
+  it("passes the offer-invariants checker on the admission surface", () => {
+    // The adapter's whole admission set — every pairing-map key — must be
+    // offerable through its own root with no coercion. This is the surface
+    // the #152 class lived on; the checker now holds it continuously.
+    expect(
+      freebuffOfferViolations({
+        surface: "freebuff adapter (admission set)",
+        offered: Object.keys(FREEBUFF_FREE_AGENT_BY_MODEL),
+        freshSelections: false,
+      }),
+    ).toEqual([]);
   });
 
   it("is accepted by the SDK's own runtime validation", async () => {

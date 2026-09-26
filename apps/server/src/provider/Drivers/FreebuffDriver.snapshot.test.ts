@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { DEFAULT_FREEBUFF_FREE_MODEL, FREEBUFF_FREE_PICKER_MODEL_IDS } from "@t3tools/contracts";
+import {
+  DEFAULT_FREEBUFF_FREE_MODEL,
+  freebuffOfferViolations,
+  FREEBUFF_FREE_PICKER_MODEL_IDS,
+} from "@t3tools/contracts";
 
 import { freebuffSnapshotModels } from "./FreebuffDriver.ts";
 
@@ -78,6 +82,31 @@ describe("freebuffSnapshotModels", () => {
       expect(model.isCustom).toBe(false);
       expect(model.capabilities).toBeNull();
     }
+  });
+
+  it("passes the offer-invariants checker on both surfaces", () => {
+    // Upstream's freebuff-offer-invariants discipline applied to THIS
+    // surface: the FRESH picker (servable rows only — a locked row here
+    // would be offer-without-gate) and the FULL listed picker (locked rows
+    // included — they are drawn, so their names must render). Adding a gate
+    // to the checker applies it here automatically.
+    const nameFor = (model: string): string | undefined =>
+      freebuffSnapshotModels().find((candidate) => candidate.slug === model)?.name;
+    expect(
+      freebuffOfferViolations({
+        surface: "freebuff driver picker (fresh)",
+        offered: [...FREEBUFF_FREE_PICKER_MODEL_IDS],
+        nameFor,
+      }),
+    ).toEqual([]);
+    expect(
+      freebuffOfferViolations({
+        surface: "freebuff driver picker (listed, locked included)",
+        offered: freebuffSnapshotModels().map((model) => model.slug),
+        freshSelections: false,
+        nameFor,
+      }),
+    ).toEqual([]);
   });
 
   it("lists the tier-locked rows inline, never as legacy", () => {
