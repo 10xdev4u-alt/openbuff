@@ -7,6 +7,7 @@
 agents/|provider agent suite (FreebuffAdapter.subagents.test.ts, contracts model map)
 common/src/types/freebuff-session.ts|wire truth: FreebuffSession.ts + admission tests
 common/src/constants/free-agents.ts|free-tier agent/reviewer pairing map (contracts)
+common/src/util/freebuff-model-selection.ts|picker admission policy: freebuffPlanRequired + freebucksRowIntent (contracts lock set, web picker lock gate)
 common/src/constants/freebuff-models.ts|free model ids + DEFAULT_FREEBUFF_FREE_MODEL (contracts)
 common/src/constants/freebuff-model-entitlements.ts|model entitlements (solar-mini4 shape) — picker/admission truth (contracts)
 common/src/constants/freebuff-model-ids.ts|model id constants — upstream's split home for ids (contracts)
