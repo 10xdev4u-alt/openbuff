@@ -1,4 +1,6 @@
 import {
+  FREEBUFF_PLAN_REQUIRED_LINE,
+  isFreebuffPlanRequiredModel,
   type ProviderInstanceId,
   type ProviderDriverKind,
   type ResolvedKeybindingsConfig,
@@ -8,6 +10,7 @@ import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { memo, useMemo, useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { ChevronRightIcon, SearchIcon } from "lucide-react";
 import { ModelListRow } from "./ModelListRow";
+import { ModelPlanLockBadge } from "./ModelPlanLockBadge";
 import { freebuffPickerPricingForInstance, type FreebuffPickerPrice } from "./modelPickerPricing";
 import { freebuffPickerDisclosureFor, type FreebuffPickerDisclosure } from "./modelPickerDisclosures";
 import { ModelPickerSidebar } from "./ModelPickerSidebar";
@@ -59,6 +62,11 @@ type ModelPickerItem = {
   pricing?: FreebuffPickerPrice;
   /** Freebuff only: data-use disclosure for the row (training/retention). */
   dataUseDisclosure?: FreebuffPickerDisclosure;
+  /** Freebuff only: tier-locked row (upstream freebuffPlanRequired) —
+   *  drawn inline, disabled, with the Paid plan badge. */
+  planRequired?: boolean;
+  /** The plan-required sentence naming the model (badge title). */
+  planRequiredLine?: string;
 };
 
 const EMPTY_MODEL_JUMP_LABELS = new Map<string, string>();
@@ -238,6 +246,14 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
         // prompts. Non-freebuff drivers skip the lookup entirely.
         const dataUseDisclosure =
           entry.driverKind === "freebuff" ? freebuffPickerDisclosureFor(model.slug) : undefined;
+        // Tier-locked freebuff rows carry the plan-lock marker (upstream's
+        // freebuffPlanRequired doctrine: listed, not hidden). The row draws
+        // disabled with the same sentence as its tooltip reason.
+        const planRequired =
+          entry.driverKind === "freebuff" ? isFreebuffPlanRequiredModel(model.slug) : false;
+        const planRequiredLine = planRequired
+          ? `${model.name} ${FREEBUFF_PLAN_REQUIRED_LINE.toLowerCase()}`
+          : undefined;
         out.push({
           slug: model.slug,
           name: model.name,
@@ -253,6 +269,9 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
             : {}),
           ...(pricing ? { pricing } : {}),
           ...(dataUseDisclosure ? { dataUseDisclosure } : {}),
+          ...(planRequired && planRequiredLine
+            ? { planRequired: true, planRequiredLine }
+            : {}),
         });
       }
     }
@@ -794,6 +813,8 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                         showNewBadge={isModelPickerNewModel(model.driverKind, model.slug)}
                         pricing={model.pricing}
                         dataUseDisclosure={model.dataUseDisclosure}
+                        planRequired={model.planRequired}
+                        planRequiredLine={model.planRequiredLine}
                         jumpLabel={modelJumpLabelByKey.get(modelKey) ?? null}
                         disabledReason={disabledReason}
                         onToggleFavorite={() => toggleFavorite(model.instanceId, model.slug)}

@@ -7,6 +7,9 @@ import {
   FREEBUFF_FREE_AGENT_BY_MODEL,
   FREEBUFF_FREE_MODEL_IDS,
   FREEBUFF_FREE_PICKER_MODEL_IDS,
+  FREEBUFF_PLAN_REQUIRED_LINE,
+  FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS,
+  isFreebuffPlanRequiredModel,
   resolveFreebuffAgentForModel,
   resolveFreebuffServedModel,
   FREEBUFF_PROMPT_RETENTION_MODEL_SLUGS,
@@ -231,6 +234,38 @@ describe("resolveFreebuffServedModel", () => {
         expect(coerced).toBe(resolveFreebuffAgentForModel("z-ai/glm-5.3-flash"));
       }
     }
+  });
+
+  it("never offers a locked row through the pairing map (offer-without-gate)", () => {
+    // Upstream's freebuff-offer-invariants doctrine, mirrored: a row the
+    // tier's admission gate refuses (plan-only at LIMITED access, pro-only,
+    // limited-offer) may be LISTED as a locked picker row — hiding it gives
+    // the upgrade nothing to point at — but it must never be SERVABLE. A
+    // slug both locked and in the pairing map would admit, then the server
+    // refuses: exactly the offer-without-gate shape.
+    for (const locked of FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS) {
+      expect(locked in FREEBUFF_FREE_AGENT_BY_MODEL, `${locked} must not be servable`).toBe(
+        false,
+      );
+      expect(isFreebuffPlanRequiredModel(locked), locked).toBe(true);
+      expect(resolveFreebuffServedModel(locked), locked).toBeUndefined();
+      expect(resolveFreebuffAgentForModel(locked)).toBe(
+        resolveFreebuffAgentForModel(DEFAULT_FREEBUFF_FREE_MODEL),
+      );
+    }
+  });
+
+  it("locks the tier-gated rows upstream lists, with the plan-required line", () => {
+    // Census 2026-09-26: plan-only at LIMITED access (gpt-6-luna,
+    // mimo-v2.6-pro), pro-only on every surface (gemini-3.8-flash).
+    expect([...FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS].sort()).toEqual(
+      [
+        "openai/gpt-6-luna",
+        "mimo/mimo-v2.6-pro",
+        "google/gemini-3.8-flash",
+      ].sort(),
+    );
+    expect(FREEBUFF_PLAN_REQUIRED_LINE).toMatch(/paid plan/i);
   });
 
   it("pins the disclosure sets (training + prompt retention)", () => {
