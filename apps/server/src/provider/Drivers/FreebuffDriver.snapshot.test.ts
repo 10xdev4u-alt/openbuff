@@ -13,7 +13,7 @@ describe("freebuffSnapshotModels", () => {
     expect(models).toHaveLength(7);
   });
 
-  it("carries only upstream-live free rows (re-verified 2026-09-24)", () => {
+  it("carries only upstream-live free rows (re-verified 2026-09-26)", () => {
     // Withdrawn 2026-08-20 → 2026-09-07 (upstream FREEBUFF_PAUSED_FREE_MODEL_IDS),
     // paywalled, god-only, or picker-retired — none may appear as a fresh pick.
     const slugs = freebuffSnapshotModels().map((model) => model.slug);
@@ -26,9 +26,12 @@ describe("freebuffSnapshotModels", () => {
       "z-ai/glm-5.2",
       "crof/kimi-k3-eco",
       "openai/gpt-5.6-luna-es",
-      // Picker-retired 09-22/09-23: servable for drain, not freshly selectable.
+      // Paused 2026-09-24 (stage two): nothing needs it admitted any more.
       "openai/gpt-5.6-luna",
-      "upstage/solar-pro4",
+      // Plan-only at this tier's access level (upstream 2026-09-25 rule);
+      // gpt-6-luna joined that set with mimo-v2.6-pro.
+      "openai/gpt-6-luna",
+      "mimo/mimo-v2.6-pro",
       // Limited-offer row: server-pushed only, never a client picker row.
       "anthropic/claude-fable-5.1",
     ]) {
@@ -36,6 +39,8 @@ describe("freebuffSnapshotModels", () => {
     }
     // The 1.2 replacement that took 1.3's slot on 2026-09-07.
     expect(slugs).toContain("meta/muse-spark-1.2-contributor");
+    // RETURNED 2026-09-25 beside Solar Mini 4 after its 09-23 retirement.
+    expect(slugs).toContain("upstage/solar-pro4");
   });
 
   it("names every row from the upstream display-name map", () => {
@@ -59,9 +64,9 @@ describe("freebuffSnapshotModels", () => {
     );
     expect(namesBySlug.get("z-ai/glm-5.3-flash")).toBe("GLM 5.3 Flash");
     expect(namesBySlug.get("deepseek/deepseek-v4-flash")).toBe("DeepSeek V4.1 Flash");
-    expect(namesBySlug.get("openai/gpt-6-luna")).toBe("GPT-6 Luna");
     expect(namesBySlug.get("mimo/mimo-v2.5")).toBe("MiMo 2.6 Flash");
     expect(namesBySlug.get("upstage/solar-mini4")).toBe("Solar Mini 4");
+    expect(namesBySlug.get("upstage/solar-pro4")).toBe("Solar Pro 4");
     expect(namesBySlug.get("stealth/space-bunny-alpha")).toBe("Space Bunny Alpha");
     expect(namesBySlug.get("meta/muse-spark-1.2-contributor")).toBe("Muse Spark 1.2");
   });

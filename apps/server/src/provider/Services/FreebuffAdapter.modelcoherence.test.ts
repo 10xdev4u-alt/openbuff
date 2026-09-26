@@ -131,9 +131,8 @@ it.layer(NodeServices.layer)(
         // header carries the pick itself — upstream serves exactly what it
         // admitted.
         for (const model of [
-          "openai/gpt-6-luna",
-          "openai/gpt-5.6-luna",
           "upstage/solar-mini4",
+          "upstage/solar-pro4",
           "z-ai/glm-5.3-flash",
         ]) {
           const { fetch, posts } = makeCoherenceFetch();
@@ -160,7 +159,13 @@ it.layer(NodeServices.layer)(
         // `undefined` for unservable ids, and the session layer's own
         // fallback pins the explicit tier default — so both legs run
         // glm-5.3-flash and the session gate never sees a mismatch.
-        for (const dead of ["stealth/ox-alpha", "minimax/minimax-m3", "acme/nonexistent"]) {
+        for (const dead of [
+          "stealth/ox-alpha",
+          "minimax/minimax-m3",
+          "openai/gpt-5.6-luna",
+          "openai/gpt-6-luna",
+          "acme/nonexistent",
+        ]) {
           const { fetch, posts } = makeCoherenceFetch();
           const adapter = yield* makeAdapter(fetch);
           yield* adapter.startSession(startInput);

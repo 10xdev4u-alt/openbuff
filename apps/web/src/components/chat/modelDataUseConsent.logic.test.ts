@@ -57,7 +57,7 @@ function seedRawConsentStorage(localStorage: Storage, value: unknown): void {
 
 describe("resolveDataUseConsent", () => {
   it("proceeds without a dialog for undisclosed rows", () => {
-    for (const slug of ["z-ai/glm-5.3-flash", "openai/gpt-6-luna", "upstage/solar-mini4"]) {
+    for (const slug of ["z-ai/glm-5.3-flash", "upstage/solar-pro4", "mimo/mimo-v2.5"]) {
       expect(resolveDataUseConsent({ nextModel: slug, models: MODELS })).toEqual({
         action: "proceed",
       });
@@ -137,7 +137,7 @@ describe("resolveDataUseConsentForSend", () => {
   });
 
   it("never asks for undisclosed rows, even with no consent state at all", () => {
-    for (const slug of ["z-ai/glm-5.3-flash", "openai/gpt-6-luna", "upstage/solar-mini4"]) {
+    for (const slug of ["z-ai/glm-5.3-flash", "upstage/solar-pro4", "mimo/mimo-v2.5"]) {
       expect(resolveDataUseConsentForSend({ model: slug, models: MODELS })).toEqual({
         action: "proceed",
       });
