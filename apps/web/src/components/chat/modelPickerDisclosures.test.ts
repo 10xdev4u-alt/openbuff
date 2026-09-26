@@ -30,8 +30,8 @@ describe("freebuffPickerDisclosureFor", () => {
   it("leaves undisclosed and unknown rows alone", () => {
     for (const slug of [
       "z-ai/glm-5.3-flash",
-      "openai/gpt-6-luna",
-      "upstage/solar-mini4",
+      "mimo/mimo-v2.5",
+      "upstage/solar-pro4",
       "stealth/ox-alpha",
       "acme/nonexistent",
     ]) {

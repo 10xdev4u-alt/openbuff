@@ -58,12 +58,13 @@ describe("freebuff subagent suite (#108)", () => {
   });
 
   it("keeps drain-row picks on their own root and model (no coercion)", () => {
-    // #143: upstream retired gpt-5.6-luna and solar-pro4 from every picker
-    // but keeps them ADMISSIBLE so draining sessions run. A pick of a drain
-    // row must resolve to its own pairing on both fields — coercing either
-    // one would switch the model under an already-admitted session.
+    // #143, restated 2026-09-26: upstream keeps picker-retired rows ADMISSIBLE
+    // while their draining sessions run (solar-pro4, picker-retired
+    // 09-23→09-25). A pick of a drain row must resolve to its own pairing on
+    // both fields — coercing either one would switch the model under an
+    // already-admitted session. gpt-5.6-luna left this class on 2026-09-24
+    // (upstream PAUSED it; picks now coerce).
     for (const [model, rootId] of [
-      ["openai/gpt-5.6-luna", "base3-free-luna"],
       ["upstage/solar-pro4", "base3-free-solar-pro4"],
     ] as const) {
       const { root, agentDefinitions } = makeFreebuffAgentSuite(model);
@@ -116,7 +117,7 @@ describe("freebuff subagent suite (#108)", () => {
     // Proven for the three suite shapes a session can produce: the default,
     // a drain-row pick (#143), and an unknown model coerced to the default.
     const { generateInitialRunState } = await import("@codebuff/sdk");
-    for (const model of [undefined, "openai/gpt-5.6-luna", "acme/nonexistent"]) {
+    for (const model of [undefined, "upstage/solar-pro4", "acme/nonexistent"]) {
       const { root, agentDefinitions } = makeFreebuffAgentSuite(model);
       expect(() =>
         generateInitialRunState({

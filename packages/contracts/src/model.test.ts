@@ -45,18 +45,16 @@ describe("default model truth", () => {
 });
 
 describe("FREEBUFF_FREE_AGENT_BY_MODEL", () => {
-  // The SERVABLE free roster, verified against live upstream 2026-09-24
-  // (FREEBUFF_MODELS + SUPPORTED + the paused list + FREE_MODE_AGENT_MODELS).
-  // gpt-6-luna (09-22), solar-mini4 and stealth/space-bunny-alpha (09-23)
-  // joined; gpt-5.6-luna and solar-pro4 left every picker the same days but
-  // stay admissible — drain rows keep their agent pairings.
+  // The SERVABLE free roster, verified against live upstream 2026-09-26
+  // (FREEBUFF_MODELS + SUPPORTED + the paused list + the limited-tier gate).
+  // gpt-6-luna and mimo-v2.6-pro are plan-only at this tier's access level
+  // (upstream 2026-09-25); gpt-5.6-luna was PAUSED 2026-09-24 (stage two);
+  // solar-pro4 returned to the picker 2026-09-25 and keeps its drain row.
   it("carries exactly the upstream servable pairings", () => {
     expect(Object.keys(FREEBUFF_FREE_AGENT_BY_MODEL).sort()).toEqual(
       [
         "deepseek/deepseek-v4-flash",
         "mimo/mimo-v2.5",
-        "openai/gpt-6-luna",
-        "openai/gpt-5.6-luna",
         "stealth/space-bunny-alpha",
         "upstage/solar-mini4",
         "upstage/solar-pro4",
@@ -66,7 +64,7 @@ describe("FREEBUFF_FREE_AGENT_BY_MODEL", () => {
     );
   });
 
-  it("recognises no withdrawn or god-only model id", () => {
+  it("recognises no withdrawn, god-only, or tier-gated model id", () => {
     for (const dead of [
       "deepseek/deepseek-v4-pro",
       "minimax/minimax-m3",
@@ -76,6 +74,12 @@ describe("FREEBUFF_FREE_AGENT_BY_MODEL", () => {
       "google/gemini-3.8-flash",
       "crof/kimi-k3-eco",
       "openai/gpt-5.6-luna-es",
+      // Paused 2026-09-24 (stage two of the 09-22 picker retirement): every
+      // pick must now coerce at admission instead of admitting into a refusal.
+      "openai/gpt-5.6-luna",
+      // Plan-only at this tier's access level (upstream 2026-09-25 rule).
+      "openai/gpt-6-luna",
+      "mimo/mimo-v2.6-pro",
     ]) {
       expect(dead in FREEBUFF_FREE_AGENT_BY_MODEL, `${dead} must not be selectable`).toBe(false);
     }
@@ -86,7 +90,6 @@ describe("FREEBUFF_FREE_AGENT_BY_MODEL", () => {
       "base3-free-deepseek-flash",
     );
     expect(FREEBUFF_FREE_AGENT_BY_MODEL["mimo/mimo-v2.5"]).toBe("base3-free-mimo");
-    expect(FREEBUFF_FREE_AGENT_BY_MODEL["openai/gpt-6-luna"]).toBe("base3-free-luna-6");
     expect(FREEBUFF_FREE_AGENT_BY_MODEL["upstage/solar-mini4"]).toBe(
       "base3-free-solar-mini4",
     );
@@ -99,13 +102,14 @@ describe("FREEBUFF_FREE_AGENT_BY_MODEL", () => {
     );
   });
 
-  it("keeps the picker-retired drain rows resolvable at admission", () => {
+  it("keeps the picker-retired drain row resolvable at admission", () => {
     // Upstream retirement is two-staged: the row leaves FREEBUFF_MODELS (all
     // pickers) the day its replacement joins, while staying in
     // SUPPORTED_FREEBUFF_MODELS and admissible so sessions admitted before
-    // the swap drain on it. Dropping these pairings would turn drain picks
-    // into refusals — the #1801 retry loop — so they stay.
-    expect(FREEBUFF_FREE_AGENT_BY_MODEL["openai/gpt-5.6-luna"]).toBe("base3-free-luna");
+    // the swap drain on it. Dropping the pairing would turn drain picks into
+    // refusals — the #1801 retry loop — so it stays. (gpt-5.6-luna lost this
+    // treatment on 2026-09-24: upstream PAUSED it, so nothing needs it
+    // admitted any more and our picks coerce instead.)
     expect(FREEBUFF_FREE_AGENT_BY_MODEL["upstage/solar-pro4"]).toBe("base3-free-solar-pro4");
   });
 
@@ -117,23 +121,25 @@ describe("FREEBUFF_FREE_AGENT_BY_MODEL", () => {
 
   it("offers exactly the upstream picker rows, retired rows excluded", () => {
     // The picker is upstream FREEBUFF_MODELS filtered to the free tier
-    // (verified 2026-09-24): the default leads, then flash, gpt-6-luna, mimo,
-    // solar-mini4, space-bunny-alpha, muse-spark-1.2. The drain rows
-    // (gpt-5.6-luna, solar-pro4) are servable but NOT freshly selectable.
+    // (verified 2026-09-26): the default leads, then flash, mimo, solar-mini4,
+    // solar-pro4 (RETURNED 09-25), space-bunny-alpha, muse-spark-1.2.
+    // gpt-6-luna is plan-only at this tier; the drain row (solar-pro4 now
+    // returned; gpt-5.6-luna paused 09-24) is servable but was NOT freshly
+    // selectable until its return.
     expect([...FREEBUFF_FREE_PICKER_MODEL_IDS]).toEqual([
       "z-ai/glm-5.3-flash",
       "deepseek/deepseek-v4-flash",
-      "openai/gpt-6-luna",
       "mimo/mimo-v2.5",
       "upstage/solar-mini4",
+      "upstage/solar-pro4",
       "stealth/space-bunny-alpha",
       "meta/muse-spark-1.2-contributor",
     ]);
     for (const pickerId of FREEBUFF_FREE_PICKER_MODEL_IDS) {
       expect(pickerId in FREEBUFF_FREE_AGENT_BY_MODEL, `${pickerId} must be servable`).toBe(true);
     }
-    for (const drainRow of ["openai/gpt-5.6-luna", "upstage/solar-pro4"]) {
-      expect(FREEBUFF_FREE_PICKER_MODEL_IDS).not.toContain(drainRow);
+    for (const excluded of ["openai/gpt-5.6-luna", "openai/gpt-6-luna", "mimo/mimo-v2.6-pro"]) {
+      expect(FREEBUFF_FREE_PICKER_MODEL_IDS).not.toContain(excluded);
     }
   });
 });
@@ -168,8 +174,7 @@ describe("resolveFreebuffAgentForModel", () => {
     expect(resolveFreebuffAgentForModel(undefined)).toBe("base3-free-glm-5-3-flash");
   });
 
-  it("resolves the new 09-22/23 rows to their own roots, not the default", () => {
-    expect(resolveFreebuffAgentForModel("openai/gpt-6-luna")).toBe("base3-free-luna-6");
+  it("resolves the 09-22/23 joiners to their own roots, not the default", () => {
     expect(resolveFreebuffAgentForModel("upstage/solar-mini4")).toBe("base3-free-solar-mini4");
     expect(resolveFreebuffAgentForModel("stealth/space-bunny-alpha")).toBe(
       "base3-free-space-bunny-alpha",
@@ -177,7 +182,6 @@ describe("resolveFreebuffAgentForModel", () => {
   });
 
   it("still resolves drain picks (picker-retired, admissible) without coercion", () => {
-    expect(resolveFreebuffAgentForModel("openai/gpt-5.6-luna")).toBe("base3-free-luna");
     expect(resolveFreebuffAgentForModel("upstage/solar-pro4")).toBe("base3-free-solar-pro4");
   });
 });
@@ -189,8 +193,6 @@ describe("resolveFreebuffServedModel", () => {
   // and upstream's session gate never sees `session_model_mismatch`.
   it("serves picker rows and drain rows as-is", () => {
     expect(resolveFreebuffServedModel("z-ai/glm-5.3-flash")).toBe("z-ai/glm-5.3-flash");
-    expect(resolveFreebuffServedModel("openai/gpt-6-luna")).toBe("openai/gpt-6-luna");
-    expect(resolveFreebuffServedModel("openai/gpt-5.6-luna")).toBe("openai/gpt-5.6-luna");
     expect(resolveFreebuffServedModel("upstage/solar-pro4")).toBe("upstage/solar-pro4");
   });
 
@@ -214,8 +216,9 @@ describe("resolveFreebuffServedModel", () => {
     // The two resolvers must agree on the servable set or the legs diverge.
     const probe = [
       "z-ai/glm-5.3-flash",
-      "openai/gpt-6-luna",
+      "upstage/solar-pro4",
       "openai/gpt-5.6-luna",
+      "openai/gpt-6-luna",
       "stealth/ox-alpha",
       "acme/nonexistent",
     ];

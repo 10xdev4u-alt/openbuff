@@ -176,7 +176,7 @@ export const DEFAULT_MODEL_BY_PROVIDER: Partial<Record<ProviderDriverKind, strin
  * The free-mode agent pairing table — one base3 root agent id per model the
  * tier can still SERVE, mirrored verbatim from upstream
  * (`common/src/constants/free-agents.ts` `FREEBUFF_WEB_BASE3_AGENT_ID_BY_MODEL`,
- * verified live 2026-09-24). The backend's free-mode allowlist rejects any
+ * verified live 2026-09-26). The backend's free-mode allowlist rejects any
  * model whose paired agent id is not sent with the request
  * (`free_mode_invalid_agent_model`), so a model may only be requested through
  * its row here. Models outside the map resolve to the default's root
@@ -184,18 +184,36 @@ export const DEFAULT_MODEL_BY_PROVIDER: Partial<Record<ProviderDriverKind, strin
  * server-side — fail-closed.
  *
  * This map is ADMISSION, not the picker: rows upstream has retired from the
- * picker but keeps admissible (gpt-5.6-luna, solar-pro4 — sessions admitted
- * before the swap drain on them, and released binaries still hold the ids)
- * KEEP their rows here so those picks still run, exactly as upstream does.
- * The picker enumeration lives in `FREEBUFF_FREE_PICKER_MODEL_IDS` below.
+ * picker but keeps admissible (solar-pro4 — sessions admitted while it was
+ * picker-retired 09-23→09-25 drain on it, and released binaries still hold
+ * the id) KEEP their row here so those picks still run, exactly as upstream
+ * does. The picker enumeration lives in `FREEBUFF_FREE_PICKER_MODEL_IDS` below.
  *
- * Roster reconciliation (re-verified against upstream 2026-09-24):
- *  - gpt-6-luna joined 2026-09-22 (5.6's slot: flex lane, premium,
- *    `FREEBUFF_GPT_6_LUNA_REASONING_EFFORT` 'high'); 5.6 left FREEBUFF_MODELS
- *    the same day but is NOT paused — drain rows stay admissible.
- *  - solar-mini4 joined 2026-09-23 (pro4's slot: same Upstage lane, unmetered
- *    per `FREEBUFF_SOLAR_MINI_4_ENTITLEMENT`); pro4 left the picker the same
- *    day, also still admissible.
+ * Roster reconciliation (re-verified against upstream 2026-09-26): the
+ * 2026-09-24/25 reshape moved several rows:
+ *  - gpt-5.6-luna is PAUSED (upstream stage two, 2026-09-24): withdrawn from
+ *    free mode entirely, every pick now refused with the non-session-ending
+ *    `model_unavailable` naming the default as replacement. Its row is DROPPED
+ *    here so our sessions coerce at admission instead of admitting into a
+ *    refusal — the #1801 doctrine is upstream's reason for pausing, and
+ *    client-side coercion is our share of it.
+ *  - solar-pro4 RETURNED to the picker 2026-09-25 (10 Freebucks, beside
+ *    solar-mini4 in the pinned Upstage lane) — back to a fresh pick here.
+ *  - gpt-6-luna (premium, flex lane) and the NEW mimo/mimo-v2.6-pro row are
+ *    open to every full-access account since 2026-09-25 but remain PLAN-ONLY
+ *    at LIMITED access (upstream `FREEBUFF_LIMITED_TIER_PLAN_ONLY_MODEL_IDS`)
+ *    — the free tier's gate, so both are dropped here despite holding
+ *    upstream roots (`base3-free-luna-6`, `base3-free-mimo-2-6-pro`). The
+ *    09-24 census wrongly listed gpt-6-luna: it sat behind the retired
+ *    US-or-paid exemption then, and behind a plan at this tier before and
+ *    since.
+ *  - muse-spark-1.2 carries the AI-training disclosure pair (`dataUse:
+ *    'training'`); upstream keeps its 1.3 sibling and the withdrawn-era rows
+ *    (deepseek-v4-pro, minimax-m3, glm-5.2, ox-alpha) in its PAUSED list.
+ *  - claude-fable-5.1 stays upstream's only limited-offer row
+ *    (`FREEBUFF_LIMITED_OFFER_MODEL_IDS`, server-pushed, 500-session cap) —
+ *    excluded here by design.
+ *  Historical notes from the 09-24 census:
  *  - stealth/space-bunny-alpha joined 2026-09-23: BETA stealth row, 1M
  *    context, `premium: false`, zero-price fence
  *    (FREEBUFF_SPACE_BUNNY_ALPHA_MAX_PRICE), capacity-probed (200 concurrent,
@@ -228,40 +246,39 @@ export const DEFAULT_MODEL_BY_PROVIDER: Partial<Record<ProviderDriverKind, strin
 export const FREEBUFF_FREE_AGENT_BY_MODEL: Readonly<Record<string, string>> = {
   "z-ai/glm-5.3-flash": "base3-free-glm-5-3-flash",
   "deepseek/deepseek-v4-flash": "base3-free-deepseek-flash",
-  "openai/gpt-6-luna": "base3-free-luna-6",
   "mimo/mimo-v2.5": "base3-free-mimo",
   "upstage/solar-mini4": "base3-free-solar-mini4",
   "stealth/space-bunny-alpha": "base3-free-space-bunny-alpha",
   "meta/muse-spark-1.2-contributor": "base3-free-muse-spark",
-  // Picker-retired but still admissible: sessions admitted before each swap
-  // drain on them (upstream keeps both rows in FREE_MODE_AGENT_MODELS for
-  // exactly this; a dropped row would refuse those picks mid-session).
-  "openai/gpt-5.6-luna": "base3-free-luna",
+  // Picker-retired but still admissible: sessions admitted while it was out
+  // of the picker (2026-09-23 → 2026-09-25) drain on it (upstream keeps the
+  // row and its root in FREE_MODE_AGENT_MODELS for exactly this; a dropped
+  // row would refuse those picks mid-session). gpt-5.6-luna lost this
+  // treatment on 2026-09-24 — upstream PAUSED it, so nothing needs it
+  // admitted any more.
   "upstage/solar-pro4": "base3-free-solar-pro4",
 };
 
 /**
  * The free-tier picker's row set — the subset of the pairing map a user may
- * freshly select. Upstream's retirement shape is two-staged: the row leaves
- * FREEBUFF_MODELS (every picker) while staying in SUPPORTED_FREEBUFF_MODELS
- * and admissible so draining sessions and released binaries keep working.
- * gpt-5.6-luna and solar-pro4 are in exactly that state; gpt-6-luna,
- * solar-mini4 and space-bunny-alpha took their slots on 09-22/09-23.
+ * freshly select, in upstream FREEBUFF_MODELS order (verified 2026-09-26).
+ * Solar Pro 4 RETURNED on 2026-09-25 beside Solar Mini 4; gpt-6-luna and
+ * mimo-v2.6-pro are plan-only at this tier's access level and stay out.
  */
 export const FREEBUFF_FREE_PICKER_MODEL_IDS: ReadonlyArray<string> = [
   "z-ai/glm-5.3-flash",
   "deepseek/deepseek-v4-flash",
-  "openai/gpt-6-luna",
   "mimo/mimo-v2.5",
   "upstage/solar-mini4",
+  "upstage/solar-pro4",
   "stealth/space-bunny-alpha",
   "meta/muse-spark-1.2-contributor",
 ];
 
 /**
  * Every ADMISSIBLE free-tier model id — the key set of
- * `FREEBUFF_FREE_AGENT_BY_MODEL`, including the picker-retired drain rows
- * (gpt-5.6-luna, solar-pro4), which a caller must NOT offer as fresh picks.
+ * `FREEBUFF_FREE_AGENT_BY_MODEL`, including the picker-retired drain row
+ * (solar-pro4), which a caller must NOT offer as fresh picks.
  * Superseded by `FREEBUFF_FREE_PICKER_MODEL_IDS` after the 2026-09-22/23
  * upstream retirements made the pairing map and the picker diverge.
  */
