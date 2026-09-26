@@ -5032,6 +5032,51 @@ function ChatViewContent(props: ChatViewProps) {
       if (composerRef.current?.validateProviderInput(outgoingFollowUpText) === false) {
         return;
       }
+      // Refusal gates run BEFORE the draft is cleared below: a locked row
+      // (sticky pick from an older binary) or a declined data-use consent
+      // must return with the user's typed follow-up intact — inside the
+      // follow-up leg both gates would run after the text is gone
+      // (CodeRabbit functional-correctness finding, PR #166).
+      const followUpLockedBlock = resolveLockedModelBlock({
+        driverKind: ctxSelectedProvider,
+        model: ctxSelectedModel,
+        models: ctxSelectedProviderModels,
+      });
+      if (followUpLockedBlock) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "warning",
+            title: "Model locked to a paid plan",
+            description: followUpLockedBlock.line,
+          }),
+        );
+        return;
+      }
+      const followUpConsent = resolveDataUseConsentForSend({
+        model: ctxSelectedModel,
+        models: ctxSelectedProviderModels,
+      });
+      if (followUpConsent.action === "cancel") {
+        toastManager.add(
+          stackedThreadToast({
+            type: "warning",
+            title: "Model data-use consent unavailable",
+            description: followUpConsent.message,
+          }),
+        );
+        return;
+      }
+      if (followUpConsent.action === "confirm") {
+        const localApi = readLocalApi();
+        const consented =
+          (await localApi?.dialogs.confirm(followUpConsent.message, {
+            variant: "default",
+          })) ?? false;
+        if (!consented) {
+          return;
+        }
+        rememberConsentedDataUseModelSlug(ctxSelectedModel);
+      }
       promptRef.current = "";
       clearComposerDraftContent(composerDraftTarget);
       composerRef.current?.resetCursorState();
