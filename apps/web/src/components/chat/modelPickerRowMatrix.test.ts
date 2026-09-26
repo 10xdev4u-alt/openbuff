@@ -86,12 +86,33 @@ describe("picker row-matrix audit", () => {
     }
   });
 
-  it("LOCKED rows: listed, locked, never servable, never consent-gated (the lock answers first)", () => {
+  it("LOCKED rows: listed, locked by census OR server verdict, admissible, consent moot", () => {
     for (const slug of FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS_ORDERED) {
-      expect(slug in FREEBUFF_FREE_AGENT_BY_MODEL, `${slug} must not be servable`).toBe(false);
-      const lock = resolveLockedModelBlock({ driverKind: "freebuff", model: slug, models: MODELS });
-      expect(lock, slug).not.toBeNull();
-      expect(lock?.line, slug).toMatch(/paid plan/i);
+      // Locked ≠ inadmissible (#166 doctrine, corrected by the server-verdict
+      // port): upstream keeps tier-locked rows in its pairing map — an
+      // entitled viewer runs the real model; the lock is per-viewer.
+      expect(slug in FREEBUFF_FREE_AGENT_BY_MODEL, `${slug} must stay admissible`).toBe(true);
+      expect(FREEBUFF_FREE_PICKER_MODEL_IDS.includes(slug), `${slug} must not be a fresh pick`).toBe(
+        false,
+      );
+      // Static census fallback locks the row...
+      const censusLock = resolveLockedModelBlock({
+        driverKind: "freebuff",
+        model: slug,
+        models: MODELS,
+      });
+      expect(censusLock, slug).not.toBeNull();
+      expect(censusLock?.line, slug).toMatch(/paid plan/i);
+      // ...and the server verdict is authoritative in BOTH directions.
+      expect(
+        resolveLockedModelBlock({
+          driverKind: "freebuff",
+          model: slug,
+          models: MODELS,
+          planRequiredModelIds: [],
+        }),
+        `${slug}: server lift wins`,
+      ).toBeNull();
       // The send path consults the lock BEFORE the consent gate, so a locked
       // row must never ask a consent question its lock already answered.
       const consent = resolveDataUseConsentForSend({ model: slug, models: MODELS });
@@ -99,12 +120,30 @@ describe("picker row-matrix audit", () => {
     }
   });
 
-  it("DRAINED rows (admissible, not freshly selectable): servable + consented, never locked", () => {
+  it("SERVER VERDICT: a widened lock reaches a servable row the census never locked", () => {
+    // The reason the verdict exists: the gate turns on the resolved access
+    // tier (and once, the country) — only the server knows. A per-viewer
+    // lock on a census-unlocked slug must render exactly like a census one.
+    const widened = resolveLockedModelBlock({
+      driverKind: "freebuff",
+      model: "upstage/solar-mini4",
+      models: MODELS,
+      planRequiredModelIds: ["upstage/solar-mini4"],
+    });
+    expect(widened).not.toBeNull();
+    expect(widened?.line).toMatch(/paid plan/i);
+  });
+
+  it("DRAINED rows (admissible, not fresh picks, not locked): currently none — class rule pinned", () => {
+    // The admissible set now = picker rows + tier-locked rows; a drain row
+    // (picker-retired but NOT paused, like solar-pro4 was 09-23→09-25) would
+    // land here. The class law: servable as-is, never locked, consented per
+    // the journal like any servable row.
     const drained = Object.keys(FREEBUFF_FREE_AGENT_BY_MODEL).filter(
-      (slug) => !FREEBUFF_FREE_PICKER_MODEL_IDS.includes(slug),
+      (slug) =>
+        !FREEBUFF_FREE_PICKER_MODEL_IDS.includes(slug) &&
+        !FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS_ORDERED.includes(slug),
     );
-    // Currently empty (the 09-25 reshape returned pro4); the class rule is
-    // pinned so the next drain row inherits the law automatically.
     for (const slug of drained) {
       expect(
         resolveLockedModelBlock({ driverKind: "freebuff", model: slug, models: MODELS }),
@@ -116,14 +155,16 @@ describe("picker row-matrix audit", () => {
   });
 
   it("the three classes partition the picker's whole world", () => {
-    // No slug may be both servable and locked (offer-without-gate), and the
-    // picker list is exactly the servable set minus drain rows.
-    const servable = new Set(Object.keys(FREEBUFF_FREE_AGENT_BY_MODEL));
+    // The forbidden pair is locked ∧ FRESHLY SELECTABLE (offer-without-
+    // gate); a locked slug may be admissible (entitled viewers run the
+    // real model), and the picker list never contains a locked slug.
     for (const locked of FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS_ORDERED) {
-      expect(servable.has(locked), locked).toBe(false);
+      expect(FREEBUFF_FREE_PICKER_MODEL_IDS.includes(locked), locked).toBe(false);
+      expect(locked in FREEBUFF_FREE_AGENT_BY_MODEL, locked).toBe(true);
     }
     for (const slug of FREEBUFF_FREE_PICKER_MODEL_IDS) {
-      expect(servable.has(slug), slug).toBe(true);
+      expect(slug in FREEBUFF_FREE_AGENT_BY_MODEL, slug).toBe(true);
+      expect(FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS_ORDERED.includes(slug), slug).toBe(false);
     }
   });
 });

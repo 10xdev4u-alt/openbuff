@@ -48,16 +48,20 @@ describe("default model truth", () => {
 });
 
 describe("FREEBUFF_FREE_AGENT_BY_MODEL", () => {
-  // The SERVABLE free roster, verified against live upstream 2026-09-26
-  // (FREEBUFF_MODELS + SUPPORTED + the paused list + the limited-tier gate).
-  // gpt-6-luna and mimo-v2.6-pro are plan-only at this tier's access level
-  // (upstream 2026-09-25); gpt-5.6-luna was PAUSED 2026-09-24 (stage two);
-  // solar-pro4 returned to the picker 2026-09-25 and keeps its drain row.
-  it("carries exactly the upstream servable pairings", () => {
+  // The ADMISSIBLE free roster, verified against live upstream 2026-09-26
+  // (upstream's pairing map + the paused list). Tier-LOCKED rows (plan-only
+  // at limited access) hold ADMITTING rows: the lock is per-viewer, resolved
+  // by the server, not an absence of a free-mode route. gpt-5.6-luna stays
+  // dropped (PAUSED 09-24: refused for EVERY viewer); solar-pro4 returned
+  // 2026-09-25 and keeps its drain row.
+  it("carries exactly the upstream admissible pairings", () => {
     expect(Object.keys(FREEBUFF_FREE_AGENT_BY_MODEL).sort()).toEqual(
       [
         "deepseek/deepseek-v4-flash",
+        "google/gemini-3.8-flash",
         "mimo/mimo-v2.5",
+        "mimo/mimo-v2.6-pro",
+        "openai/gpt-6-luna",
         "stealth/space-bunny-alpha",
         "upstage/solar-mini4",
         "upstage/solar-pro4",
@@ -67,22 +71,18 @@ describe("FREEBUFF_FREE_AGENT_BY_MODEL", () => {
     );
   });
 
-  it("recognises no withdrawn, god-only, or tier-gated model id", () => {
+  it("recognises no withdrawn or god-only model id", () => {
     for (const dead of [
       "deepseek/deepseek-v4-pro",
       "minimax/minimax-m3",
       "stealth/ox-alpha",
       "z-ai/glm-5.2",
       "meta/muse-spark-1.3-contributor",
-      "google/gemini-3.8-flash",
       "crof/kimi-k3-eco",
       "openai/gpt-5.6-luna-es",
       // Paused 2026-09-24 (stage two of the 09-22 picker retirement): every
       // pick must now coerce at admission instead of admitting into a refusal.
       "openai/gpt-5.6-luna",
-      // Plan-only at this tier's access level (upstream 2026-09-25 rule).
-      "openai/gpt-6-luna",
-      "mimo/mimo-v2.6-pro",
     ]) {
       expect(dead in FREEBUFF_FREE_AGENT_BY_MODEL, `${dead} must not be selectable`).toBe(false);
     }
@@ -184,6 +184,16 @@ describe("resolveFreebuffAgentForModel", () => {
     );
   });
 
+  it("resolves tier-locked entitled picks to their own upstream roots", () => {
+    // The lock is per-viewer, not per-catalog: an entitled sticky pick must
+    // run the REAL model through its own root, never coerce to the default.
+    expect(resolveFreebuffAgentForModel("openai/gpt-6-luna")).toBe("base3-free-luna-6");
+    expect(resolveFreebuffAgentForModel("mimo/mimo-v2.6-pro")).toBe("base3-free-mimo-2-6-pro");
+    expect(resolveFreebuffAgentForModel("google/gemini-3.8-flash")).toBe(
+      "base3-free-gemini-3-8-flash",
+    );
+  });
+
   it("still resolves drain picks (picker-retired, admissible) without coercion", () => {
     expect(resolveFreebuffAgentForModel("upstage/solar-pro4")).toBe("base3-free-solar-pro4");
   });
@@ -194,9 +204,15 @@ describe("resolveFreebuffServedModel", () => {
   // free session resolve their model through THIS function, so a pick the
   // pairing map cannot serve falls through to the tier default on BOTH legs
   // and upstream's session gate never sees `session_model_mismatch`.
-  it("serves picker rows and drain rows as-is", () => {
+  it("serves picker, drain, and tier-locked-entitled rows as-is", () => {
     expect(resolveFreebuffServedModel("z-ai/glm-5.3-flash")).toBe("z-ai/glm-5.3-flash");
     expect(resolveFreebuffServedModel("upstage/solar-pro4")).toBe("upstage/solar-pro4");
+    // Locked ≠ inadmissible: entitled viewers run the real model.
+    expect(resolveFreebuffServedModel("openai/gpt-6-luna")).toBe("openai/gpt-6-luna");
+    expect(resolveFreebuffServedModel("mimo/mimo-v2.6-pro")).toBe("mimo/mimo-v2.6-pro");
+    expect(resolveFreebuffServedModel("google/gemini-3.8-flash")).toBe(
+      "google/gemini-3.8-flash",
+    );
   });
 
   it("refuses to serve withdrawn or unknown ids", () => {
@@ -236,20 +252,22 @@ describe("resolveFreebuffServedModel", () => {
     }
   });
 
-  it("never offers a locked row through the pairing map (offer-without-gate)", () => {
-    // Upstream's freebuff-offer-invariants doctrine, mirrored: a row the
-    // tier's admission gate refuses (plan-only at LIMITED access, pro-only,
-    // limited-offer) may be LISTED as a locked picker row — hiding it gives
-    // the upgrade nothing to point at — but it must never be SERVABLE. A
-    // slug both locked and in the pairing map would admit, then the server
-    // refuses: exactly the offer-without-gate shape.
+  it("never offers a locked row as a FRESH pick (offer-without-gate)", () => {
+    // Upstream's freebuff-offer-invariants doctrine, mirrored precisely:
+    // a tier-locked row is LISTED (locked picker row) and stays ADMISSIBLE
+    // (entitled viewers run the real model — the server resolves the
+    // per-viewer gate). The forbidden pair is locked ∧ IN THE PICKER: a
+    // fresh selection the tier's admission would refuse. A locked slug must
+    // also resolve to its OWN root — a sticky entitled pick runs the real
+    // model, never a coercion.
     for (const locked of FREEBUFF_PLAN_REQUIRED_MODEL_SLUGS) {
-      expect(locked in FREEBUFF_FREE_AGENT_BY_MODEL, `${locked} must not be servable`).toBe(
+      expect(locked in FREEBUFF_FREE_PICKER_MODEL_IDS, `${locked} must not be a fresh pick`).toBe(
         false,
       );
       expect(isFreebuffPlanRequiredModel(locked), locked).toBe(true);
-      expect(resolveFreebuffServedModel(locked), locked).toBeUndefined();
-      expect(resolveFreebuffAgentForModel(locked)).toBe(
+      expect(locked in FREEBUFF_FREE_AGENT_BY_MODEL, `${locked} must stay admissible`).toBe(true);
+      expect(resolveFreebuffServedModel(locked), locked).toBe(locked);
+      expect(resolveFreebuffAgentForModel(locked)).not.toBe(
         resolveFreebuffAgentForModel(DEFAULT_FREEBUFF_FREE_MODEL),
       );
     }

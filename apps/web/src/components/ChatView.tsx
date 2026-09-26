@@ -5041,6 +5041,7 @@ function ChatViewContent(props: ChatViewProps) {
         driverKind: ctxSelectedProvider,
         model: ctxSelectedModel,
         models: ctxSelectedProviderModels,
+        planRequiredModelIds: planRequiredVerdictFor(ctxSelectedModelSelection.instanceId),
       });
       if (followUpLockedBlock) {
         toastManager.add(
@@ -5175,11 +5176,14 @@ function ChatViewContent(props: ChatViewProps) {
     }
     // Tier-locked rows never send (upstream's offer-without-gate law,
     // send-path half): a sticky pick from an older binary must hit this
-    // refusal, not the server's admission gate.
+    // refusal, not the server's admission gate. The server's per-viewer
+    // verdict overrides the static census when the snapshot has one — an
+    // entitled viewer's sticky pick passes and the real admission decides.
     const lockedBlock = resolveLockedModelBlock({
       driverKind: ctxSelectedProvider,
       model: ctxSelectedModel,
       models: ctxSelectedProviderModels,
+      planRequiredModelIds: planRequiredVerdictFor(ctxSelectedModelSelection.instanceId),
     });
     if (lockedBlock) {
       toastManager.add(
@@ -5657,6 +5661,22 @@ function ChatViewContent(props: ChatViewProps) {
     setActivePendingUserInputQuestionIndex(Math.max(activePendingProgress.questionIndex - 1, 0));
   }, [activePendingProgress, setActivePendingUserInputQuestionIndex]);
 
+  // The SERVER's per-viewer plan-required verdict for an instance, when its
+  // snapshot has captured one (upstream freebucks.planRequiredModelIds).
+  // Present = authoritative over the static census; absent = census fallback
+  // (older server). Every lock gate reads through this. Declared BEFORE the
+  // plan handlers so their dependency arrays can track it (a stale verdict
+  // would block an entitled viewer or admit a newly locked one — CodeRabbit
+  // functional-correctness finding, PR #173).
+  const planRequiredVerdictFor = useCallback(
+    (instanceId: ProviderInstanceId | undefined): ReadonlyArray<string> | undefined =>
+      instanceId === undefined
+        ? undefined
+        : providerStatuses.find((snapshot) => snapshot.instanceId === instanceId)?.usage
+            ?.freebucks?.planRequiredModelIds,
+    [providerStatuses],
+  );
+
   const onSubmitPlanFollowUp = useCallback(
     async ({
       text,
@@ -5708,6 +5728,7 @@ function ChatViewContent(props: ChatViewProps) {
         driverKind: ctxSelectedProvider,
         model: ctxSelectedModel,
         models: ctxSelectedProviderModels,
+        planRequiredModelIds: planRequiredVerdictFor(ctxSelectedModelSelection.instanceId),
       });
       if (lockedBlock) {
         toastManager.add(
@@ -5863,6 +5884,7 @@ function ChatViewContent(props: ChatViewProps) {
       startThreadTurn,
       environmentId,
       composerRef,
+      planRequiredVerdictFor,
     ],
   );
 
@@ -5912,6 +5934,7 @@ function ChatViewContent(props: ChatViewProps) {
       driverKind: ctxSelectedProvider,
       model: ctxSelectedModel,
       models: ctxSelectedProviderModels,
+      planRequiredModelIds: planRequiredVerdictFor(ctxSelectedModelSelection.instanceId),
     });
     if (lockedBlock) {
       toastManager.add(
@@ -6069,6 +6092,7 @@ function ChatViewContent(props: ChatViewProps) {
     startThreadTurn,
     environmentId,
     composerRef,
+    planRequiredVerdictFor,
   ]);
 
   const getModelDisabledReason = useCallback(
@@ -6084,6 +6108,7 @@ function ChatViewContent(props: ChatViewProps) {
               driverKind: lockedEntry.driver,
               model,
               models: lockedEntry.models,
+              planRequiredModelIds: lockedEntry?.usage?.freebucks?.planRequiredModelIds,
             })
           : null;
       if (lockedBlock) {
@@ -6155,6 +6180,7 @@ function ChatViewContent(props: ChatViewProps) {
               driverKind: resolvedDriverKind,
               model: resolvedModel,
               models: entry?.models,
+              planRequiredModelIds: entry?.usage?.freebucks?.planRequiredModelIds,
             })
           : null;
       if (switchLockedBlock) {
